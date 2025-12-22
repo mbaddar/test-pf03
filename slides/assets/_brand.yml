@@ -1,0 +1,80 @@
+# SDAIA Academy branding for Quarto (revealjs-friendly)
+# Place this file at your project root as _brand.yml
+# You can override per-deck in the YAML front matter if needed.
+
+meta:
+  name:
+    short: "SDAIA"
+    full: "Saudi Data & AI Authority"
+  links:
+    home: "https://sdaia.gov.sa"
+    brand: "https://sdaia.gov.sa/en/MediaCenter/Pages/SdaiaIdentification.aspx"
+
+color:
+  palette:
+    sdaia-navy: "#1C355E"
+    sdaia-orange: "#e96852"
+    sdaia-teal: "#00ae8d"
+    sdaia-purple: "#625d9c"
+    sdaia-cyan: "#00c1de"
+    sdaia-green: "#6abf4b"
+    sdaia-yellow: "#FFB548"
+    sdaia-black: "#101820"
+
+    # Neutral ramp (for borders, subtle fills, code blocks)
+    gray-0: "#ffffff"
+    gray-1: "#f7f9fc"
+    gray-2: "#eef2f7"
+    gray-3: "#dbe2ea"
+    gray-4: "#b8c2cf"
+    gray-5: "#5b6678"
+
+  # Semantic roles
+  background: gray-0
+  foreground: sdaia-black
+  primary: sdaia-navy
+  secondary: sdaia-purple
+  tertiary: sdaia-teal
+  success: sdaia-green
+  info: sdaia-cyan
+  warning: sdaia-yellow
+  danger: sdaia-orange
+  light: gray-1
+  dark: sdaia-black
+
+logo:
+  images:
+    icon: ../../assets/icon.svg
+    full: ../../assets/sdaia.svg
+    anim: ../../assets/anim.svg
+  small: icon
+  medium: full
+  large: full
+
+typography:
+  fonts:
+    - family: "Noto Sans"
+      source: google
+    - family: "Noto Sans Arabic"
+      source: google
+    - family: "JetBrains Mono"
+      source: google
+  base:
+    family: "Noto Sans"
+  monospace:
+    family: "JetBrains Mono"
+  link:
+    decoration: none
+
+defaults:
+  quarto:
+    format:
+      revealjs:
+        theme: default
+        css: "../assets/sdaia.scss"
+        title-slide-attributes:
+          data-background-image: "../assets/anim.svg"
+          data-background-opacity: 0.1
+        include-in-header:
+          text: |
+            <link rel="icon" href="../assets/icon.svg">

@@ -1,0 +1,1380 @@
+---
+pagetitle: "W1 D4"
+title: "Python & Tooling"
+subtitle: "AI Professionals Bootcamp | Week 1"
+date: 2025-12-17
+---
+
+# Day 4: Streamlit GUI + (Optional) httpx
+
+**Goal:** Build a **GUI** for your CSV Profiler that can **load data**, **preview results**, and **export JSON + Markdown**.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** Yesterday you built a *CLI*. Today you’ll build a *GUI* using the same profiling library.
+
+**Do:** Show a 30-second demo: click “Upload CSV” → click “Generate report” → download.
+
+**Ask:** “What’s the biggest difference between a CLI and a GUI from a user perspective?”
+
+**Timebox:** 3 minutes.
+:::
+
+---
+
+## Today’s Flow
+
+- **Session 1 (60m):** Streamlit basics (how it thinks)
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Connect Streamlit → your `csv_profiler` package
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Optional: `httpx` for loading CSVs from URLs + better error UX
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** CSV Profiler — Part 4 (Streamlit)
+
+---
+
+## Learning Objectives {.smaller}
+
+By the end of today, you can:
+
+- Explain Streamlit’s **rerun model** and why widgets “cause reruns”
+- Build a simple Streamlit UI using **sidebar + widgets**
+- Load CSV data from:
+  - file upload (required)
+  - local path (optional)
+  - URL via `httpx` (stretch)
+- Reuse your package functions:
+  - `profile_rows()`
+  - `render_markdown()`
+- Export profiling results as:
+  - downloadable **JSON** + **Markdown**
+  - saved to `outputs/` on disk (local run)
+
+---
+
+## Quick refresher: running the project (and `PYTHONPATH`) {.smaller}
+
+Your code is split into:
+
+- `src/csv_profiler/` → your **package** (profiling + rendering logic)
+- `app.py` → your **Streamlit script** (UI only)
+
+Because the package is inside `src/`, we run commands with `PYTHONPATH=src` so Python can import it.
+
+**macOS/Linux**
+
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+**Windows PowerShell**
+
+```powershell
+$env:PYTHONPATH="src"
+uv run python -m csv_profiler.cli profile data/sample.csv
+uv run streamlit run app.py
+```
+
+::: callout-tip
+If your project does **not** have a `src/` folder (flat layout), you can usually **omit** `PYTHONPATH=src`.
+:::
+
+---
+
+## Warm-up (5 minutes) {.smaller}
+
+Run your Day 3 CLI to confirm your profiler still works.
+
+**macOS/Linux**
+
+```bash
+cd ~/bootcamp/csv-profiler
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv --preview
+```
+
+**Windows PowerShell**
+
+```powershell
+cd ~/bootcamp/csv-profiler
+$env:PYTHONPATH="src"
+uv run python -m csv_profiler.cli profile data/sample.csv --preview
+```
+
+**Checkpoint:** you still get:
+
+- `outputs/report.json`
+- `outputs/report.md`
+
+::: {.muted}
+`--preview` just prints a small preview so you know the CLI is reading the file correctly.
+:::
+
+::: {.notes}
+**Do:** Walk around. If someone can’t run it, pair them with a peer for 2 minutes.
+
+**Ask:** “What does `PYTHONPATH=src` do?”
+
+**Timebox:** 5 minutes.
+:::
+
+---
+
+## Week project progress (where we are) {.smaller}
+
+You already have:
+
+- Package: `src/csv_profiler/`
+- CLI: `python -m csv_profiler.cli profile ...`
+- JSON report + Markdown report
+
+Today you add:
+
+- `app.py` Streamlit GUI
+- Upload CSV → profile → preview → export
+
+Tomorrow you add:
+
+- `git` + GitHub submission (deadline **tomorrow 11:59pm**)
+
+# Session 1
+
+::: {.muted}
+Streamlit basics (how it thinks)
+:::
+
+---
+
+## Session 1 objectives
+
+- Install and run Streamlit using `uv`
+- Understand the **rerun** mental model
+- Use core widgets:
+  - `st.file_uploader`, `st.button`, `st.checkbox`
+- Display data and results:
+  - `st.write`, `st.table`, `st.json`
+
+---
+
+## What is Streamlit?
+
+Streamlit lets you build a web app with only Python.
+
+**You write:**
+
+- a single Python script (`app.py`)
+- that script renders UI + responds to interactions
+
+**You get:**
+
+- a local web app (usually at `http://localhost:8501`)
+- no HTML/CSS/JS required
+
+---
+
+## Mental model: Streamlit reruns your script
+
+Every user interaction triggers a rerun:
+
+- changing a widget value
+- clicking a button
+- uploading a file
+
+**Implications**
+
+- don’t put slow work at the top of the file
+- use buttons and caching for expensive steps
+- use `st.session_state` to remember results
+
+::: {.notes}
+**Say:** It’s not a server with “routes” like Flask. It’s a script that re-executes.
+
+**Ask:** “If the script reruns, why don’t we lose everything?”
+
+**Answer:** session state helps.
+:::
+
+---
+
+## Install Streamlit (once)
+
+From your project folder:
+
+```bash
+uv pip install streamlit
+```
+
+Then run:
+
+```bash
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+::: callout-tip
+If `PYTHONPATH=src` feels annoying, keep a small run script later.
+For today, just use it.
+:::
+
+---
+
+## Your first Streamlit app (Hello)
+
+Create `app.py` in the project root:
+
+```python
+import streamlit as st
+
+st.set_page_config(page_title="CSV Profiler", layout="wide")
+st.title("CSV Profiler")
+st.caption("Week 01 • Day 04 — Streamlit GUI")
+```
+
+You should see a page with a title.
+
+---
+
+## Quick Check
+
+**Question:** If you edit `app.py` and save… what happens?
+
+A. The page updates automatically  
+B. You must restart Streamlit  
+C. It updates only if you refresh the browser
+
+. . .
+
+**Answer:** Usually **A** (Streamlit hot-reloads), but sometimes you’ll refresh.
+
+---
+
+## Sidebar layout pattern
+
+Most Streamlit apps use a sidebar for inputs:
+
+```python
+import streamlit as st
+
+st.sidebar.header("Inputs")
+source = st.sidebar.selectbox("Data source", ["Upload", "Local path"])
+st.write("Selected:", source)
+```
+
+**Rule of thumb:** Inputs in sidebar, results in main area.
+
+---
+
+## Python refresher: how we’ll represent CSV data {.smaller}
+
+When we parse a CSV, we’ll store it as:
+
+- `rows` → a **list**
+- each item in `rows` → a **dict** (one CSV row)
+
+Example:
+
+```python
+rows = [
+    {"name": "Aisha", "age": "23"},
+    {"name": "Fahad", "age": "31"},
+]
+```
+
+- Dict keys = column headers  
+- Dict values = strings from the CSV (we can convert later)
+
+Accessing a value from a dict (by key):
+
+```python
+row = {"name": "Aisha", "age": "23"}
+name_value = row["name"]   # "Aisha"
+```
+
+---
+
+## Python refresher: “first 5 rows” (list slicing)
+
+A list can be “sliced” to take a smaller piece:
+
+```python
+preview_rows = rows[:5]   # first 5 (or fewer)
+```
+
+Also, list items are accessed by index (starting from 0):
+
+```python
+# Only do this if the list is not empty:
+first_row = rows[0]
+```
+
+We’ll use slicing for previews, and sometimes `rows[0]` to look at the first row.
+
+---
+
+## Showing data without extra libraries
+
+If you have Python objects:
+
+- list of dicts
+- dict
+- list of strings
+
+Streamlit can still display them:
+
+```python
+st.write(rows[:5])
+st.json({"example": "any dict works"})
+st.write("Rows:", len(rows))
+```
+
+::: aside
+If you happen to have `pandas`, `st.dataframe(df)` is great but optional.
+:::
+
+---
+
+## File upload: `st.file_uploader`
+
+This widget returns an uploaded file object (or `None`):
+
+```python
+uploaded = st.file_uploader("Upload a CSV", type=["csv"])
+if uploaded is not None:
+    st.write("Filename:", uploaded.name)
+    st.write("Size (bytes):", uploaded.size)
+```
+
+---
+
+## Python refresher: bytes vs text (why we call `.decode(...)`)
+
+- `uploaded.getvalue()` returns **bytes** (raw file data)
+- `csv.DictReader(...)` expects **text** (a string)
+
+So we decode bytes → text:
+
+```python
+raw = uploaded.getvalue()          # bytes
+text = raw.decode("utf-8-sig")     # str (text)
+```
+
+`"utf-8-sig"` helps with CSVs exported from Excel.
+
+---
+
+## Parsing uploaded CSV (standard library)
+
+We’ll:
+
+1. Decode bytes → text
+2. Wrap the text in a *file-like* object (`StringIO`)
+3. Use `csv.DictReader` to get dictionaries per row
+
+```python {code-line-numbers="1-2|3-4|5-6|"}
+import csv
+from io import StringIO
+text = uploaded.getvalue().decode("utf-8-sig")
+file_like = StringIO(text)
+reader = csv.DictReader(file_like)   # each row becomes a dict
+rows = list(reader)                  # list of dicts
+```
+
+**Checkpoint:** `rows` is a `list[dict[str, str]]`.
+
+---
+
+## Common pitfall: encoding
+
+If you get decoding errors:
+
+- try `"utf-8-sig"` (common with Excel exports)
+- avoid “guessing” too much—log what you tried
+
+```python
+data = uploaded.getvalue().decode("utf-8-sig")
+```
+
+---
+
+## Activity: “Find the rerun”
+
+1. Add a checkbox:
+
+```python
+show_preview = st.checkbox("Show preview", value=True)
+```
+
+2. Upload a CSV.
+3. Toggle the checkbox.
+
+**Question:** Did it rerun? How do you know?
+
+::: {.notes}
+**Say:** Look for clues: random numbers change, “uploaded name” re-prints, etc.
+
+**Timebox:** 5 minutes.
+:::
+
+---
+
+## Task 1 — Hello Streamlit (10 minutes)
+
+Create `app.py` that:
+
+- sets page title
+- shows a title + short caption
+- shows one sidebar selectbox
+
+**Checkpoint:** App runs and shows UI.
+
+---
+
+## Solution — Task 1
+
+```python
+import streamlit as st
+
+st.set_page_config(page_title="CSV Profiler", layout="wide")
+
+st.title("CSV Profiler")
+st.caption("Upload a CSV → profile it → export JSON + Markdown")
+
+st.sidebar.header("Inputs")
+source = st.sidebar.selectbox("Data source", ["Upload"])
+st.write("Selected:", source)
+```
+
+Run:
+
+```bash
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+---
+
+## Task 2 — Upload + preview (15 minutes)
+
+Add:
+
+- `st.file_uploader(..., type=["csv"])`
+- show:
+  - file name
+  - first 5 rows (only if a checkbox is checked)
+
+**Checkpoint:** Uploading a CSV shows a preview.
+
+---
+
+## Solution — Task 2 (upload + preview) {.smaller}
+
+```python
+import csv
+from io import StringIO
+import streamlit as st
+
+st.set_page_config(page_title="CSV Profiler", layout="wide")
+st.title("CSV Profiler")
+
+uploaded = st.file_uploader("Upload a CSV", type=["csv"])
+show_preview = st.checkbox("Show preview", value=True)
+
+if uploaded is not None:
+    text = uploaded.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(StringIO(text)))
+
+    st.write("Filename:", uploaded.name)
+    st.write("Rows loaded:", len(rows))
+
+    if show_preview:
+        st.write(rows[:5])
+else:
+    st.info("Upload a CSV to begin.")
+```
+
+---
+
+## Layout helper: `st.columns` + `metric`
+
+`st.columns(n)` creates **side-by-side** containers you can write into.
+
+```python
+cols = st.columns(2)
+cols[0].metric("Rows", 1200)
+cols[1].metric("Columns", 35)
+```
+
+We’ll use this to make summaries easier to read.
+
+---
+
+## Task 3 — Show row/column counts (10 minutes)
+
+After loading `rows`:
+
+- compute:
+  - `n_rows`
+  - `n_cols`
+- show them as metrics
+
+**Checkpoint:** numbers match what you expect.
+
+---
+
+## Solution — Task 3 (counts)
+
+```python
+n_rows = len(rows)
+
+n_cols = 0
+if n_rows > 0:
+    n_cols = len(rows[0])
+
+cols = st.columns(2)
+cols[0].metric("Rows", n_rows)
+cols[1].metric("Columns", n_cols)
+```
+
+::: {.notes}
+**Say:** This is the same pattern you’ll use for the profile summary.
+:::
+
+---
+
+## Recap (Session 1)
+
+- Streamlit reruns your script on every interaction
+- `st.sidebar` is great for inputs
+- You can load CSV using only `csv` + `StringIO`
+- Next: reuse your real profiling library (not demo code)
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we will connect Streamlit
+
+# Session 2
+
+::: {.muted}
+Connect Streamlit → your `csv_profiler` package
+:::
+
+---
+
+## Session 2 objectives
+
+- Import and call your profiling functions from Streamlit
+- Display report content in a readable way
+- Export outputs:
+  - download buttons
+  - save-to-disk button (local run)
+
+---
+
+## UI architecture: keep logic in the package
+
+**Bad (hard to test):**
+
+- all parsing + profiling inside `app.py`
+
+**Good (reusable):**
+
+- `csv_profiler/` handles reading/profiling/rendering
+- `app.py` only handles inputs + display
+
+Today we’ll reuse:
+
+- `csv_profiler.profiling.profile_rows`
+- `csv_profiler.render.render_markdown`
+
+---
+
+## Importing your package inside Streamlit
+
+Because your package lives in `src/`, you must run with:
+
+```bash
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH="src"
+uv run streamlit run app.py
+```
+
+::: callout-warning
+If you see `ModuleNotFoundError: csv_profiler`, it’s almost always `PYTHONPATH`.
+:::
+
+---
+
+## “Generate report” should be a button
+
+Profiling can be expensive.
+
+Pattern:
+
+- load data (fast)
+- click button to profile (slow)
+- save results in `st.session_state`
+
+```python
+if st.button("Generate report"):
+    report = profile_rows(rows)
+    st.session_state["report"] = report
+```
+
+---
+
+## Displaying the report (human-friendly) {.smaller}
+
+Show:
+
+- Summary metrics: rows, cols
+- A table of column profiles
+- A “raw JSON” expander for debugging
+
+**Streamlit pattern:** use an expander to hide “too much detail”:
+
+```python
+st.write(report["columns"])
+
+with st.expander("Raw JSON (debug)", expanded=False):
+    st.json(report)
+```
+
+::: {.muted}
+The `with ...:` block means: “put the UI elements inside this expander.”
+:::
+
+---
+
+## Task 4 — Call `profile_rows()` (15 minutes)
+
+In `app.py`:
+
+1. Import:
+
+```python
+from csv_profiler.profiling import profile_rows
+```
+
+2. When a CSV is uploaded:
+   - parse rows
+   - click “Generate report”
+   - store `report` in session state
+
+**Checkpoint:** Find `n_rows` and `n_cols` in `report`.
+
+---
+
+## Solution — Task 4 (profile button + session state)
+
+```python
+from csv_profiler.profiling import profile_rows
+
+if uploaded is not None:
+    text = uploaded.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(StringIO(text)))
+
+    if st.button("Generate report"):
+        st.session_state["report"] = profile_rows(rows)
+
+report = st.session_state.get("report")
+if report is not None:
+    st.write("Rows:", report["n_rows"])
+    st.write("Cols:", report["n_cols"])
+```
+
+---
+
+## Task 5 — Render Markdown preview (10 minutes)
+
+Import and use:
+
+```python
+from csv_profiler.render import render_markdown
+```
+
+Show Markdown preview:
+
+- `st.markdown(render_markdown(report))`
+
+**Checkpoint:** You see headings + a columns table.
+
+---
+
+## Solution — Task 5 (Markdown preview)
+
+```python
+from csv_profiler.render import render_markdown
+
+if report is not None:
+    st.subheader("Markdown preview")
+    st.markdown(render_markdown(report))
+```
+
+::: callout-tip
+If it looks too long, put the preview in an expander.
+:::
+
+---
+
+## Export outputs: download buttons
+
+Students often confuse “download” vs “save”.
+
+For a local app, do **both**:
+
+- download buttons for convenience
+- save-to-disk for the project requirement
+
+Download buttons:
+
+```python
+st.download_button("Get JSON", data=json_text, file_name="report.json")
+st.download_button("Get Markdown", data=md_text, file_name="report.md")
+```
+
+---
+
+## Task 6 — Download JSON + Markdown (10 minutes)
+
+When `report` exists:
+
+- produce `json_text` with `json.dumps(..., indent=2, ensure_ascii=False)`
+- produce `md_text` with `render_markdown(report)`
+- add two download buttons
+
+**Checkpoint:** you can download both files.
+
+---
+
+## Solution — Task 6 (download buttons)
+
+```python
+import json
+from csv_profiler.render import render_markdown
+
+if report is not None:
+    json_text = json.dumps(report, indent=2, ensure_ascii=False)
+    md_text = render_markdown(report)
+
+    l, r = st.columns(2)
+    l.download_button("Get JSON", data=json_text, file_name="report.json")
+    r.download_button("Get Markdown", data=md_text, file_name="report.md")
+```
+
+::: callout-tip
+`l, r = x` is a quick way to unpack iterables. The above is equivalent to:
+```python
+cols = st.columns(2)
+l = cols[0]  # left column
+r = cols[1]  # right column
+```
+:::
+
+---
+
+## Export outputs: save to disk (local run)
+
+Use `pathlib.Path`:
+
+```python
+from pathlib import Path
+
+out_dir = Path("outputs")
+out_dir.mkdir(parents=True, exist_ok=True)
+(out_dir / "report.json").write_text(json_text, encoding="utf-8")
+(out_dir / "report.md").write_text(md_text, encoding="utf-8")
+```
+
+Then show success with `st.success(...)`.
+
+---
+
+## Quick Check
+
+**Question:** Why is “save to disk” sometimes a bad idea in a deployed web app?
+
+. . .
+
+**Answer:** The server may be shared, ephemeral, or read-only.
+For this bootcamp, you run locally, so it’s fine.
+
+---
+
+## Recap (Session 2)
+
+- You can reuse your profiling package in Streamlit
+- Use a **button** for expensive work
+- Store results in `st.session_state`
+- Export both:
+  - download buttons
+  - save-to-disk button
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** We will take a look at `httpx`.
+
+# Session 3
+
+::: {.muted}
+Optional: `httpx` + better error UX
+:::
+
+---
+
+## Session 3 objectives
+
+- Fetch CSV data from a URL using `httpx.get()`
+- Parse remote CSV safely (timeouts + status checks)
+- Improve Streamlit error messages (`st.error`, `st.warning`, `st.stop`)
+- (Stretch) Reduce repeated work using caching
+
+---
+
+## Why load from a URL?
+
+Use cases:
+
+- instructor provides a dataset link
+- you test quickly without moving files
+- you compare multiple CSV sources
+
+**Rule:** Always validate the URL and handle failures.
+
+---
+
+## Install httpx (optional)
+
+```bash
+uv pip install httpx
+```
+
+Then in Python:
+
+```python
+import httpx
+```
+
+---
+
+## httpx: minimal safe GET pattern
+
+```python
+import httpx
+
+r = httpx.get(url, timeout=10.0)
+r.raise_for_status()
+text = r.text
+```
+
+**What this gives you:**
+
+- a timeout (no infinite waiting)
+- clear error for 404/500 responses
+
+---
+
+## Parse remote CSV from text
+
+Same trick as upload:
+
+```python
+import csv
+from io import StringIO
+
+rows = list(csv.DictReader(StringIO(text)))
+```
+
+**Checkpoint:** `rows` is a list of dictionaries.
+
+---
+
+## Better Streamlit errors
+
+Use:
+
+- `st.error("...")` for blocking problems
+- `st.warning("...")` for non-blocking issues
+- `st.stop()` to stop the current run cleanly
+
+Example:
+
+```python
+if len(rows) == 0:
+    st.error("CSV loaded but has no data rows.")
+    st.stop()
+```
+
+---
+
+## Python refresher: `try/except` (catch failures) {.smaller}
+
+When we do a network request, it can fail:
+
+- bad URL
+- no internet
+- 404 / 500 errors
+- timeout
+
+We don’t want the whole app to crash, so we catch the error and show a friendly message:
+
+```python
+try:
+    # risky code
+    ...
+except Exception as e:
+    st.error("Something went wrong: " + str(e))
+    st.stop()
+```
+
+::: {.muted}
+`e` is the error object. `str(e)` turns it into a readable message.
+:::
+
+---
+
+## Task 7 — Add “Load from URL” (15 minutes)
+
+In the sidebar:
+
+- add a checkbox: “Load from URL”
+- if checked:
+  - show a text input for URL
+  - use `httpx.get()` to fetch
+  - parse CSV rows
+  - profile like normal
+
+**Checkpoint:** A valid URL produces a report.
+
+---
+
+## Solution — Task 7 (URL loader) {.smaller}
+
+```python
+import csv
+from io import StringIO
+import httpx
+
+use_url = st.sidebar.checkbox("Load from URL", value=False)
+
+url = ""
+if use_url:
+    url = st.sidebar.text_input("CSV URL", placeholder="https://.../data.csv")
+
+if use_url:
+    if url == "":
+        st.warning("Paste a URL to load a CSV.")
+        st.stop()
+
+    try:
+        r = httpx.get(url, timeout=10.0)
+        r.raise_for_status()
+        text = r.text
+        rows = list(csv.DictReader(StringIO(text)))
+    except Exception as e:
+        st.error("Failed to load URL: " + str(e))
+        st.stop()
+```
+
+::: aside
+This is “stretch”: upload-only is required; URL loading is optional.
+:::
+
+---
+
+## Stretch: caching expensive work (optional)
+
+If profiling takes time, cache the result.
+
+```python
+@st.cache_data
+def cached_profile(rows):
+    return profile_rows(rows)
+```
+
+Then call `cached_profile(rows)`.
+
+::: {.muted}
+The line starting with `@` is a **decorator**: it changes how the function runs (here: remembers results).
+You don’t need to write your own decorators today.
+:::
+
+::: callout-warning
+Caching can hide bugs when you change code.
+Use it only after your logic works.
+:::
+
+---
+
+## Mini-quiz: what should have a timeout?
+
+A. HTTP requests  
+B. Disk reads  
+C. Profiling computation  
+D. All of the above
+
+. . .
+
+**Answer:** **D**. At minimum: HTTP requests.
+
+---
+
+## Recap (Session 3)
+
+- `httpx.get(url, timeout=...)` + `raise_for_status()` is a good baseline
+- Use Streamlit error patterns to keep UX clean
+- Caching is optional, but useful for performance
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we will start the hands-on session.
+
+# Hands-on
+
+::: {.muted}
+CSV Profiler — Part 4: Streamlit App
+:::
+
+---
+
+## Hands-on goal
+
+By the end of the lab, your project has:
+
+- `app.py` (Streamlit GUI)
+- Upload CSV → profile → preview
+- Export:
+  - download JSON + Markdown
+  - save JSON + Markdown to `outputs/`
+
+**You should be able to demo in 60 seconds.**
+
+---
+
+## Success criteria (what we will check)
+
+Your Streamlit app must:
+
+1. Run with `uv` (same environment as the CLI)
+2. Read a CSV using **file upload**
+3. Generate a profiling report using your package code
+4. Export outputs as **JSON + Markdown**
+5. Handle basic errors:
+   - no file uploaded
+   - empty CSV
+
+---
+
+## Hands-on checklist
+
+Commands you should be able to run:
+
+```bash
+# CLI
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv
+
+# GUI
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+---
+
+## Task 1 — Create `app.py` scaffold (10 minutes)
+
+`app.py` should contain:
+
+- `st.set_page_config(...)`
+- title + caption
+- sidebar section called “Inputs”
+- empty placeholders for:
+  - rows
+  - report
+
+**Checkpoint:** App starts and looks clean.
+
+---
+
+## Solution — Task 1 scaffold
+
+```python
+import streamlit as st
+
+st.set_page_config(page_title="CSV Profiler", layout="wide")
+
+st.title("CSV Profiler")
+st.caption("Upload CSV → profile → export JSON + Markdown")
+
+st.sidebar.header("Inputs")
+
+rows = None
+report = st.session_state.get("report")
+```
+
+---
+
+## Task 2 — Upload CSV and parse rows (15 minutes)
+
+Add:
+
+- `uploaded = st.file_uploader(...)`
+- parse into `rows` (a list of dictionaries)
+- show a preview toggle + preview
+
+**Checkpoint:** preview shows reasonable values.
+
+---
+
+## Solution — Task 2 (upload + parse)
+
+```python
+import csv
+from io import StringIO
+
+uploaded = st.file_uploader("Upload a CSV", type=["csv"])
+show_preview = st.sidebar.checkbox("Show preview", value=True)
+
+if uploaded is not None:
+    text = uploaded.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(StringIO(text)))
+
+    if show_preview:
+        st.subheader("Preview")
+        st.write(rows[:5])
+else:
+    st.info("Upload a CSV to begin.")
+```
+
+---
+
+## Task 3 — Generate report (button) (15 minutes)
+
+When `rows` exist:
+
+- show a button: “Generate report”
+- compute report using `profile_rows(rows)`
+- store in `st.session_state["report"]`
+
+**Checkpoint:** report summary displays rows/cols.
+
+---
+
+## Solution — Task 3 (generate report)
+
+```python
+from csv_profiler.profiling import profile_rows
+
+if rows is not None:
+    if len(rows) > 0:
+        if st.button("Generate report"):
+            st.session_state["report"] = profile_rows(rows)
+
+report = st.session_state.get("report")
+if report is not None:
+    cols = st.columns(2)
+    cols[0].metric("Rows", report["n_rows"])
+    cols[1].metric("Columns", report["n_cols"])
+```
+
+---
+
+## Task 4 — Show column table + Markdown preview (15 minutes)
+
+Display:
+
+- `report["columns"]` in a readable format
+- Markdown preview using `render_markdown(report)` (prefer an expander)
+
+**Checkpoint:** Markdown contains the table.
+
+---
+
+## Solution — Task 4 (display)
+
+```python
+from csv_profiler.render import render_markdown
+
+if report is not None:
+    st.subheader("Columns")
+    st.write(report["columns"])
+
+    with st.expander("Markdown preview", expanded=False):
+        st.markdown(render_markdown(report))
+```
+
+---
+
+## Task 5 — Export (download + save) (20 minutes)
+
+Add exports:
+
+- Download JSON + Markdown
+- Save JSON + Markdown to `outputs/`
+
+UI suggestion:
+
+- a text input for `report_name` (default: `report`)
+- a button: “Save to outputs/”
+
+**Checkpoint:** `report.json` & `report.md` in `outputs/`.
+
+---
+
+## Solution — Task 5 (exports) {.smaller}
+
+```python
+import json
+from pathlib import Path
+from csv_profiler.render import render_markdown
+
+if report is not None:
+    report_name = st.sidebar.text_input("Report name", value="report")
+
+    json_file = report_name + ".json"
+    json_text = json.dumps(report, indent=2, ensure_ascii=False)
+
+    md_file = report_name + ".md"
+    md_text = render_markdown(report)
+
+    c1, c2 = st.columns(2)
+    c1.download_button("Download JSON", data=json_text, file_name=json_file)
+    c2.download_button("Download Markdown", data=md_text, file_name=md_file)
+
+    if st.button("Save to outputs/"):
+        out_dir = Path("outputs")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / json_file).write_text(json_text, encoding="utf-8")
+        (out_dir / md_file).write_text(md_text, encoding="utf-8")
+        st.success("Saved outputs/" + json_file + " and outputs/" + md_file)
+```
+
+---
+
+## Task 6 — Error handling polish (10 minutes)
+
+Add friendly errors:
+
+- If uploaded CSV has **no rows**:
+  - show `st.error(...)`
+  - stop execution
+
+- If `rows` exists but the first row has **no columns** (no headers detected):
+  - show `st.warning(...)`
+
+**Checkpoint:** app never crashes with a Python traceback for these cases.
+
+---
+
+## Solution — Task 6 (safe guards)
+
+```python
+if uploaded is not None:
+    text = uploaded.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(StringIO(text)))
+
+    if len(rows) == 0:
+        st.error("CSV has no data. Upload a CSV with at least 1 row.")
+        st.stop()
+
+    if len(rows[0]) == 0:
+        st.warning("CSV has no headers (no columns detected).")
+```
+
+---
+
+## Run + verify (5 minutes)
+
+Run:
+
+```bash
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+Verify:
+
+- Upload works
+- Generate report works
+- Download works
+- Save-to-disk works
+
+---
+
+## Troubleshooting
+
+**Problem:** `ModuleNotFoundError: csv_profiler`  
+**Fix:** run with `PYTHONPATH=src` (and be in the project root)
+
+**Problem:** Streamlit command not found  
+**Fix:** `uv pip install streamlit`
+
+**Problem:** Upload works, but profiling fails  
+**Fix:** print a sample row: `st.write(rows[0])` to inspect keys/values
+
+---
+
+## Stretch tasks (if you finish early)
+
+1. Add a “Top missing columns” section:
+   - sort by `missing_pct` and show top 5
+2. Add a filter:
+   - show only columns of type `number`
+3. Add a timing display:
+   - show `report["timing_ms"]` if present (or measure in app)
+
+---
+
+## Recap (Day 4)
+
+You now have:
+
+- a working Streamlit GUI for your profiler
+- exports to JSON + Markdown
+- basic error handling
+
+Tomorrow:
+
+- Git + GitHub workflow
+- final polish and submission by **tomorrow 11:59pm**
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**What part of Streamlit felt most “different” from normal Python scripts?**
+
+---
+
+## What to do after class (Day 4 assignment)
+
+**Due:** before Day 5 starts (Thu, 18 Dec 2025)
+
+1. Make the UI demo-ready:
+   - nice headings and layout
+   - clear buttons
+2. Add one UX improvement:
+   - `st.expander`, `st.tabs`, or `st.columns`
+3. Confirm these commands work:
+
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv
+PYTHONPATH=src uv run streamlit run app.py
+```
+
+**Deliverable:** updated project folder (ready to be committed + pushed tomorrow).
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

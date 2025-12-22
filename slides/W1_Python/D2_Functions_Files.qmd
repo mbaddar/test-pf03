@@ -1,0 +1,1708 @@
+---
+pagetitle: "W1 D2"
+title: "Python & Tooling"
+subtitle: "AI Professionals Bootcamp | Week 1"
+date: 2025-12-15
+---
+
+# Day 2: Functions + Files + Better Profiling
+
+**Goal:** Turn yesterday’s script into **clean functions** and produce a **richer profiling report** for any CSV.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+---
+
+## Today’s Flow {.smaller}
+
+- **Session 1 (60m):** Procedural programming with functions
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Strings + formatting → generate Markdown reports
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Files + `pathlib` + `csv` + `json`
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** CSV Profiler — Part 2 (type inference + numeric stats)
+
+---
+
+## Learning Objectives {.smaller}
+
+By the end of today, you can:
+
+- Write **reusable functions** (args, defaults, `*args`, `**kwargs`, keyword-only)
+- Use built-ins like `enumerate`, `zip`, `sorted`, `any`, `all`
+- Generate clean **Markdown** with f-strings + `join()`
+- Use `pathlib.Path` for safe paths
+- Read CSVs with `csv.DictReader` and write JSON with `json.dumps()`
+- Upgrade your profiler: **type inference + stats**
+- Add **type hints** to clarify inputs/outputs (`name: str`, `-> float | None`)
+- Use `lambda` for tiny one-off helper functions (mostly with `key=`)
+
+---
+
+## Warm-up (5 minutes)
+
+Open your Day 1 project and run it.
+
+**Target command (Unix/macOS):**
+
+```bash
+cd ~/bootcamp/csv-profiler
+uv run python main.py
+```
+
+**Target command (Windows PowerShell):**
+
+```powershell
+cd $HOME\bootcamp\csv-profiler
+uv run python main.py
+```
+
+**Checkpoint:** `outputs/report.json` and `outputs/report.md` are created.
+
+---
+
+## If imports fail: quick fixes (2 common layouts)
+
+If you see `ModuleNotFoundError: No module named 'csv_profiler'`, Python can’t find your project package.
+
+**Layout A (recommended this week): package folder next to `main.py`**
+
+```text
+csv-profiler/
+  main.py
+  csv_profiler/
+    __init__.py
+    ...
+```
+
+Run:
+
+```bash
+uv run python main.py
+```
+
+---
+
+## If imports fail: quick fixes (2 common layouts) {.smaller}
+
+**Layout B (src layout): package folder inside `src/`**
+
+```text
+csv-profiler/
+  main.py
+  src/
+    csv_profiler/
+      __init__.py
+      ...
+```
+
+Run with `PYTHONPATH=src`:
+
+- Unix/macOS:
+
+```bash
+PYTHONPATH=src uv run python main.py
+```
+
+- Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH="src"
+uv run python main.py
+```
+
+::: callout-tip
+We’ll formalize packaging later. For now, pick one layout and keep moving.
+:::
+---
+
+## Week project progress {.smaller}
+
+You already have (Day 1):
+
+- Read a CSV into `rows`: a list of dictionaries (each row looks like `{"age": "19", "name": "Aisha"}`)
+- Compute a **basic** report (rows/columns + missing count)
+- Write `report.json` and `report.md`
+
+Today you will add:
+
+- Column **type inference**: `number` vs `text`
+- Numeric stats: `min`, `max`, `mean`, `unique`
+- Cleaner Markdown structure (tables + sections)
+
+---
+
+## Quick recap: Python building blocks we’ll use today {.smaller}
+
+You don’t need to be a Python expert — but we *will* use these basics repeatedly:
+
+- **Lists**: `values = []`, `values.append(x)`
+- **Dicts**: `row["age"]` and safe access `row.get("age", "")`
+- **`for` loops**: repeat work for each item in a list
+- **`None`**: means “no value” (we’ll use it for “couldn’t parse”)
+- **Imports**: `import csv`, `from pathlib import Path`
+
+```python
+row = {"age": "19", "name": "Aisha"}
+age_text = row.get("age", "")   # returns "" if the key is missing
+
+for ch in age_text:
+    print(ch)
+```
+
+::: aside
+If you see “type hints” (`x: int`, `-> str`) in reference code online: don’t stress — we’ll introduce them later today. They’re optional metadata.
+:::
+
+# Session 1
+
+::: {.muted}
+Functions: your unit of thinking
+:::
+
+---
+
+## Session 1 objectives
+
+- Explain **why** we refactor into functions
+- Write functions with clear inputs/outputs
+- Use different parameter styles safely
+- Use built-ins that make your code shorter and clearer
+
+---
+
+## Why functions? (in one sentence)
+
+A function lets you **name a piece of logic** so you can:
+
+- reuse it
+- test it
+- read it later without re-thinking it
+- change it in one place
+
+::: aside
+In this project, “profiling” becomes a set of small functions you can compose.
+:::
+
+---
+
+## Anatomy of a function
+
+```python
+def greet(name):
+    """Return a friendly greeting."""
+    return "Hello " + name + "!"
+```
+
+- `def` creates the function
+- parameters go inside `(...)`
+- indentation defines the function body
+- `return` sends a value back to the caller
+- docstrings (triple quotes) are optional but helpful
+
+---
+
+## Type hints: optional inputs/outputs “labels”
+
+Type hints tell readers (and tooling) what you *expect*.
+
+```python
+def greet(name: str) -> str:
+    return "Hello " + name + "!"
+````
+
+* `name: str` means “I expect a string”
+* `-> str` describes the return value
+* hints don’t change behavior — they’re metadata
+
+::: callout-tip
+Hints are helpful when a function can return different things, like `float | None` (“either a float or missing”).
+:::
+
+---
+
+## Mini-exercise — add type hints (2 minutes)
+
+Add type hints (no body changes):
+
+```python
+def add(a, b=1.0):
+    return a + b
+
+def clean_text(s):
+    return s.strip().casefold()
+```
+
+. . .
+
+**Checkpoint:** your headers look like:
+
+```python
+def add(a: float, b: float = 1.0) -> float: ...
+def clean_text(s: str) -> str: ...
+```
+
+::: aside
+If you’re not sure, guess — hints are easy to adjust later.
+:::
+
+---
+
+## Side effects vs return values {.smaller}
+
+::: callout-tip
+## Definition
+
+A function's **side effect** is any change to the system's state during its execution apart from its retun value
+:::
+
+**Pure-ish** (good for profiling):
+
+```python
+def mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+```
+
+**Side effect** (still useful, but keep controlled):
+
+```python
+def write_text(path: str, text: str) -> None:
+    open(path, "w").write(text)
+```
+
+::: callout-warning
+Try to keep *profiling logic* mostly “return values”.
+Keep *I/O* (reading/writing files) in a small number of places.
+:::
+
+---
+
+## Parameters + defaults (most common)
+
+```python
+def add(a, b=1.0):
+    return a + b
+```
+
+Calls:
+
+```python
+add(1, 2)
+add(7)
+add(a=1, b=2)
+add(b=2, a=1)
+```
+
+---
+
+## Quick Check
+
+What is printed?
+
+```python
+def add(a, b=1):
+    return a + b
+
+print(add(10))
+print(add(10, 5))
+```
+
+. . .
+
+**Answer:** `11` then `15`
+
+---
+
+## `*args`: “many positional arguments”
+
+```python
+def accumulate(*numbers: float) -> float:
+    total = 0.0
+    for n in numbers:
+        total += n
+    return total
+
+accumulate(1, 2, 3)     # 6.0
+accumulate(5)           # 5.0
+accumulate()            # 0.0
+```
+
+---
+
+## `**kwargs`: “many keyword arguments”
+
+```python
+def double(**values: float) -> dict[str, float]:
+    # values is a dict: {name: number}
+    out = {}
+    for k, v in values.items():
+        out[k] = v * 2
+    return out
+
+double(a=1, b=2)  # {"a": 2, "b": 4}
+```
+
+::: aside
+- `values` is a dict containing the extra keyword arguments
+- `.items()` lets you loop over `(key, value)` pairs
+- In this week, we’ll mostly use `**kwargs` for optional config later
+:::
+
+---
+
+## Positional-only and keyword-only parameters
+
+```python
+# a: positional-only
+# b: positional-or-keyword
+# c: keyword-only
+def f(a, /, b, *, c):
+    print(a, b, c)
+
+f(1, 2, c=3)
+f(1, b=2, c=3)
+```
+
+Why care?
+
+- keyword-only parameters make call sites **more readable**
+- positional-only can protect APIs from accidental misuse
+
+---
+
+## Common built-in functions you’ll use today
+
+- Sequence math: `len`, `sum`, `min`, `max`, `all`, `any`
+- Sequence helpers: `sorted`, `reversed`, `enumerate`, `zip`
+- Iteration: `range`, `iter`, `next`
+
+---
+
+## `enumerate`: index + value
+
+Instead of:
+
+```python
+i = 0
+for line in lines:
+    print(i, line)
+    i += 1
+```
+
+Use:
+
+```python
+for i, line in enumerate(lines):
+    print(i, line)
+```
+
+---
+
+## `zip`: walk multiple lists together
+
+```python
+names = ["A", "B", "C"]
+ages = [20, 21, 19]
+
+for name, age in zip(names, ages):
+    print(name, age)
+```
+
+::: aside
+In the report, `zip()` can pair column names with stats.
+:::
+
+---
+
+## `sorted`: keep original list unchanged
+
+```python
+values = [3, 1, 2]
+print(sorted(values))   # [1, 2, 3]
+print(values)           # [3, 1, 2]
+```
+
+Also useful with a key:
+
+```python
+sorted(words, key=len)
+```
+
+---
+
+## `sorted(..., key=..., reverse=True)`: custom ordering {.smaller}
+
+Sometimes you’re sorting **pairs** like `("value", count)` and you want to sort by the count.
+
+A “pair” here is a 2-item **tuple** (think “small fixed list”).
+
+```python
+pairs = [("a", 2), ("b", 5), ("c", 1)]
+
+def by_count(pair: tuple[str, int]) -> int:
+    return pair[1]
+
+print(sorted(pairs, key=by_count, reverse=True))
+# [('b', 5), ('a', 2), ('c', 1)]
+```
+
+::: aside
+We’ll use this pattern to compute “top values” for text columns.
+:::
+
+---
+
+## Lambda: a tiny function inline (common with `key=`) {.smaller}
+
+Sometimes you need a “throwaway” helper for a single call.
+
+```python
+# same result as defining `by_count(...)`
+sorted(pairs, key=lambda pair: pair[1], reverse=True)
+````
+
+* syntax: `lambda <inputs>: <expression>`
+* lambdas are **one expression** (no multi-line bodies)
+* if you want reuse, comments, or tests → use `def`
+
+::: aside
+You’ll most often see lambdas with `sorted`, `min`, and `max`.
+:::
+
+---
+
+## Mini-exercise — lambda + `sorted` (3 minutes) {.smaller}
+
+Sort words by **length**, longest first:
+
+```python
+words = ["python", "ai", "bootcamp", "data"]
+sorted_words = sorted(words, key=..., reverse=True)
+print(sorted_words)
+```
+
+**Checkpoint:** `['bootcamp', 'python', 'data', 'ai']`
+
+::: callout-tip
+Your `key=` function gets one word at a time and returns the sort key.
+:::
+
+---
+
+## Map/filter vs comprehensions
+
+**These work:**
+
+```python
+list(map(lambda x: x * 2, [1, 2, 3]))
+list(filter(lambda x: x % 2 == 0, [1, 2, 3, 4]))
+```
+
+But for readability, prefer:
+
+```python
+[x * 2 for x in [1, 2, 3]]
+[x for x in [1, 2, 3, 4] if x % 2 == 0]
+```
+
+---
+
+## Cleaning CSV text values: `strip()` + `casefold()` {.smaller}
+
+CSV values arrive as text, and they often include extra spaces or inconsistent capitalization.
+
+```python
+s = "  NA  "
+print(s.strip())            # "NA"
+print(s.strip().casefold()) # "na"
+```
+
+We’ll use this idea in `is_missing(...)`.
+
+---
+
+## Mini-exercise 1 (5 minutes) {.smaller}
+
+Write a function:
+
+```python
+def is_missing(value: str | None) -> bool:
+    """True for empty / null-ish CSV values."""
+    ...
+```
+
+Treat these as missing (case-insensitive):
+
+- `""`
+- `"na"`, `"n/a"`
+- `"null"`, `"none"`, `"nan"`
+- whitespace-only strings
+
+**Checkpoint:** `is_missing(" NA ")` is `True`.
+
+---
+
+## Solution — `is_missing`
+
+```python
+MISSING = {"", "na", "n/a", "null", "none", "nan"}
+
+def is_missing(value: str | None) -> bool:
+    if value is None:
+        return True
+    cleaned = value.strip().casefold()
+    return cleaned in MISSING
+```
+
+::: callout-tip
+Use `casefold()` (stronger than `lower()`) for case-insensitive checks.
+:::
+
+---
+
+## `try/except`: safe parsing (you’ll use this a lot) {.smaller}
+
+CSV values arrive as **strings**. Converting to a number can fail (example: `"abc"`).
+
+```python
+value = "3.14"
+
+try:
+    x = float(value)
+except ValueError:
+    x = None
+```
+
+- Code inside `try:` runs first
+- If Python hits a `ValueError`, it jumps to `except:`
+- We return/use `None` to mean “couldn’t parse”
+
+---
+
+## Mini-exercise 2 (6 minutes)
+
+Write a safe parser:
+
+```python
+def try_float(value: str) -> float | None:
+    """Return float(value) or None if it fails."""
+    ...
+```
+
+**Checkpoint:** `try_float("3.14")` → `3.14`, `try_float("abc")` → `None`
+
+---
+
+## Solution — `try_float`
+
+```python
+def try_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+```
+
+---
+
+## Type inference (simple rule)
+
+For a list of strings:
+
+- ignore missing values
+- if **every remaining** value parses as float → `number`
+- else → `text`
+
+::: aside
+This is a safe baseline. Later we can add a “mostly numeric” threshold.
+:::
+
+---
+
+## Example: infer type
+
+```python
+def infer_type(values: list[str]) -> str:
+    usable = [v for v in values if not is_missing(v)]
+    if not usable:
+        return "text"
+    for v in usable:
+        if try_float(v) is None:
+            return "text"
+    return "number"
+```
+
+---
+
+## Quick Check
+
+If a column has values: `["1", "2", "3", "x"]`
+
+- With the simple rule, is it `number` or `text`?
+
+. . .
+
+**Answer:** `text` (because `"x"` is not numeric)
+
+---
+
+## Advanced features (you saw them in the reference) {.smaller}
+
+You will see these patterns later, but you don’t need them for today’s assignment:
+
+- recursion
+- closures + `nonlocal`
+- generators (`yield`)
+- decorators (`@something`)
+- `global` (usually avoid)
+
+::: callout-warning
+If you don’t need a “fancy tool”, don’t use it yet.
+Write the simplest working code.
+:::
+
+---
+
+## Recursion (rare, but you should recognize it)
+
+A function that calls itself needs:
+
+- a **base case** (stop condition)
+- a **step** that moves toward the base case
+
+```python
+def count_down(n: int) -> None:
+    if n < 0:
+        return
+    print(n)
+    count_down(n - 1)
+```
+
+::: aside
+In data work, recursion is uncommon. Loops are usually simpler.
+:::
+
+---
+
+## Closures + `nonlocal` (state without globals)
+
+A nested function can “remember” variables from the outer function.
+
+```python
+def make_counter():
+    i = 0
+    def inc():
+        nonlocal i
+        i += 1
+        return i
+    return inc
+
+c = make_counter()
+c()  # 1
+c()  # 2
+```
+
+---
+
+## Decorators (wrapping a function)
+
+A decorator takes a function and returns a new function.
+
+```python
+def logged(fn):
+    def wrapper(*args, **kwargs):
+        print("Calling:", fn.__name__)
+        return fn(*args, **kwargs)
+    return wrapper
+
+@logged
+def add(a, b):
+    return a + b
+```
+
+---
+
+## `global` (exists, but avoid it)
+
+```python
+x = 0
+
+def f():
+    global x
+    x += 1
+    print(x)
+```
+
+Why avoid?
+
+- makes bugs harder to trace
+- breaks testability
+
+---
+
+## Common pitfall: mutable default arguments
+
+Bad:
+
+```python
+def add_item(x, items=[]):
+    items.append(x)
+    return items
+```
+
+Better:
+
+```python
+def add_item(x, items=None):
+    if items is None:
+        items = []
+    items.append(x)
+    return items
+```
+::: callout-warning
+Default value is evaluated and created only once, not on each function call.
+:::
+
+---
+
+## (Optional) Generators in one slide
+
+```python
+def counter():
+    yield 1
+    yield 2
+    yield 3
+
+for x in counter():
+    print(x)
+```
+
+Why mention it?
+
+- generators let you process data **without holding everything in memory**
+- we will keep today’s CSV small → lists are fine
+
+---
+
+## Recap (Session 1)
+
+- Functions make your code reusable and readable
+- Learn parameter styles (`*args`, `**kwargs`, keyword-only)
+- Use built-ins (`enumerate`, `zip`, `sorted`) to write less code
+- Implement core helpers: `is_missing`, `try_float`, `infer_type`
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** open your project folder and keep it ready.
+
+# Session 2
+
+::: {.muted}
+Strings → Markdown reports
+:::
+
+---
+
+## Session 2 objectives
+
+- Use f-strings + format specs for readable numbers
+- Build Markdown using **lists of lines + join**
+- Produce a report that a human can skim in 30 seconds
+
+---
+
+## Markdown is just text
+
+Your strategy:
+
+1. Build `lines: list[str]` (a list of strings)
+2. `text = "\n".join(lines) + "\n"`
+3. Write to a file
+
+Notes:
+- `lines.append("...")` adds **one** line
+- `lines.extend(other_lines)` adds **many** lines (when a helper returns a list of lines)
+
+This avoids painful string concatenation.
+
+---
+
+## f-strings: readable and powerful
+
+```python
+rows = 1234567
+missing_pct = 0.03456
+
+print(f"Rows: {rows:,}")
+print(f"Missing: {missing_pct:.1%}")
+```
+
+Example output:
+
+- `Rows: 1,234,567`
+- `Missing: 3.5%`
+
+---
+
+## Format specs you’ll actually use
+
+- `:,` → thousands separators
+- `.2f` → 2 decimals
+- `.1%` → percent with 1 decimal
+- `>10` / `<10` → align width
+
+Example:
+
+```python
+value = 5 / 3
+print(f"{value:>8.2f}")
+```
+
+---
+
+## Building a section (pattern)
+
+```python
+lines = []
+lines.append("# CSV Profiling Report")
+lines.append("")
+lines.append("## Summary")
+lines.append(f"- Rows: {n_rows:,}")
+text = "\n".join(lines) + "\n"
+```
+
+---
+
+## Imports refresher: use code from libraries
+
+Python ships with lots of useful modules (CSV, JSON, dates…).
+
+Two common styles:
+
+```python
+import json
+from datetime import datetime
+
+now = datetime.now()
+print(json.dumps({"time": str(now)}))
+```
+
+::: aside
+If you can run `main.py`, you already used imports — this is just a reminder.
+:::
+
+---
+
+## Mini-exercise 3 (6 minutes) {.smaller}
+
+Create a function that returns a markdown header block:
+
+```python
+from datetime import datetime
+
+def md_header(source: str) -> list[str]:
+    """Return lines for the top of the report."""
+    ...
+```
+
+Must include:
+
+- title line `# CSV Profiling Report`
+- source file name
+- generated time (`datetime.now().isoformat(timespec="seconds")`)
+
+---
+
+## Solution — `md_header`
+
+```python
+from datetime import datetime
+
+def md_header(source: str) -> list[str]:
+    ts = datetime.now().isoformat(timespec="seconds")
+    return [
+        "# CSV Profiling Report",
+        "",
+        f"- **Source:** `{source}`",
+        f"- **Generated:** `{ts}`",
+        "",
+    ]
+```
+
+---
+
+## Markdown tables (quick pattern)
+
+```text
+| Column | Type | Missing | Unique |
+|---|---:|---:|---:|
+| age | number | 0 (0.0%) | 12 |
+```
+
+Rules:
+
+- the second line is the “separator”
+- align numeric columns with `---:` (optional but nice)
+
+---
+
+## Mini-exercise 4 (8 minutes)
+
+Write a function to render the table header:
+
+```python
+def md_table_header() -> list[str]:
+    ...
+```
+
+It should return:
+
+- header row
+- separator row
+
+---
+
+## Solution — `md_table_header`
+
+```python
+def md_table_header() -> list[str]:
+    return [
+        "| Column | Type | Missing | Unique |",
+        "|---|---:|---:|---:|",
+    ]
+```
+
+---
+
+## Rendering one row (pattern) {.smaller}
+
+```python
+def md_col_row(name: str, type_: str, missing: int, missing_pct: float, unique: int) -> str:
+    return f"| `{name}` | {type_} | {missing} ({missing_pct:.1%}) | {unique} |"
+```
+
+::: callout-tip
+`type` is a built-in reserved keyword in Python. When you need to use it as a variable name, a common convention is to append an underscore (e.g., `type_`) to avoid conflicts while keeping the name meaningful.
+:::
+
+---
+
+## Mini-exercise 5 (7 minutes)
+
+Write:
+
+```python
+def md_bullets(items: list[str]) -> list[str]:
+    """Turn ['a','b'] into ['- a','- b']"""
+    ...
+```
+
+---
+
+## Solution — `md_bullets`
+
+```python
+def md_bullets(items: list[str]) -> list[str]:
+    return [f"- {x}" for x in items]
+```
+
+---
+
+## Common string “cleaning” moves
+
+When working with CSVs:
+
+- `strip()` to remove whitespace
+- `casefold()` for robust lowercasing
+- `replace()` to normalize text
+- `split()` to break things apart
+- `join()` to assemble output
+
+---
+
+## Quick Check
+
+What is the output?
+
+```python
+s = "  NA  "
+print(s.strip().casefold())
+```
+
+. . .
+
+**Answer:** `na`
+
+---
+
+## Recap (Session 2)
+
+- Build Markdown using `lines` + `"\n".join(lines)`
+- Use f-string format specs for readable numbers
+- Use small rendering helpers (`md_header`, `md_table_header`, `md_col_row`)
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll work with files + `csv` + `json`.
+
+# Session 3
+
+::: {.muted}
+Files + `pathlib` + formats
+:::
+
+---
+
+## Session 3 objectives
+
+- Use `pathlib.Path` instead of fragile string paths
+- Read CSV robustly with `csv.DictReader`
+- Write JSON with stable formatting
+- Apply safe file-writing habits (`mkdir`, encoding, newline)
+
+---
+
+## `pathlib.Path` is your default
+
+```python
+from pathlib import Path
+
+p = Path("data") / "sample.csv"
+print(p.exists())
+print(p.suffix)   # ".csv"
+print(p.stem)     # "sample"
+```
+
+Why?
+
+- cross-platform paths
+- easy parent folders
+- clearer code
+
+---
+
+## Safe “write file” pattern
+
+```python
+from pathlib import Path
+
+def write_text(path: str | Path, text: str) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+```
+
+---
+
+## Quick Check
+
+Why do we use `mkdir(parents=True, exist_ok=True)`?
+
+A. It deletes old folders  
+B. It creates folders if missing, and doesn’t crash if they exist  
+C. It makes the file smaller
+
+. . .
+
+**Answer:** B
+
+---
+
+## `with` blocks: open files safely {.smaller}
+
+When you open a file, you should close it. The `with ... as ...:` pattern closes it automatically (even if something errors).
+
+```python
+from pathlib import Path
+
+path = Path("data/sample.csv")
+
+with path.open("r", encoding="utf-8") as f:
+    first_line = f.readline()
+
+print(first_line)
+```
+
+::: aside
+Same idea for writing: open → write → automatically close.
+:::
+
+---
+
+## CSV reading: `DictReader`
+
+```python
+from csv import DictReader
+from pathlib import Path
+
+def read_csv_rows(path: str | Path) -> list[dict[str, str]]:
+    path = Path(path)
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return [dict(row) for row in DictReader(f)]
+```
+
+Notes:
+
+- `newline=""` is recommended for CSV files
+- values come as strings → you parse them
+
+---
+
+## Mini-exercise 6 (7 minutes)
+
+Write a helper to get columns names from rows:
+
+```python
+def get_columns(rows: list[dict[str, str]]) -> list[str]:
+    ...
+```
+
+Rules:
+
+- if `rows` is empty → return `[]`
+- otherwise use the first row’s keys
+
+---
+
+## Solution — `get_columns`
+
+```python
+def get_columns(rows: list[dict[str, str]]) -> list[str]:
+    if not rows:
+        return []
+    return list(rows[0].keys())
+```
+
+---
+
+## JSON writing: stable and readable
+
+```python
+import json
+from pathlib import Path
+
+def write_json(report: dict, path: str | Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")
+```
+
+::: aside
+Notice how report can be any `dict`.
+:::
+
+---
+
+## Designing your report schema (practical)
+
+Keep it simple and stable:
+
+```python
+report = {
+  "source": {"path": "..."},
+  "summary": {"rows": 100, "columns": 8},
+  "columns": {
+     "age": {"type": "number", "missing": 2, "unique": 31, "min": 0.0, ...},
+     "city": {"type": "text", "missing": 0, "unique": 5, "top": [{"value": "Riyadh", "count": 20}]},
+  }
+}
+```
+
+::: callout-tip
+A clear schema makes your CLI and Streamlit app easy later.
+:::
+
+---
+
+## Optional: base64 vs pickle (30 seconds)
+
+- `base64`: text encoding of bytes (useful for transport)
+- `pickle`: Python-only serialization
+
+::: callout-warning
+Never unpickle data from someone you don’t trust.
+Pickle can execute code during loading.
+:::
+
+---
+
+## Recap (Session 3)
+
+- Use `Path` for paths + folder creation
+- Read CSV with `DictReader`
+- Write JSON with `json.dumps(..., indent=2)`
+- Define a clear report schema
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** Hands-on build (Part 2).
+
+# Hands-on
+
+::: {.muted}
+Start the project: CSV Profiler (Part 2)
+:::
+
+---
+
+## Hands-on success criteria (what “done” means)
+
+By the end of the day:
+
+- Your profiler detects `number` vs `text`
+- For numeric columns you compute: `count`, `missing`, `unique`, `min`, `max`, `mean`
+- You generate:
+  - `outputs/report.json`
+  - `outputs/report.md` (with a summary + a table + per-column details)
+
+---
+
+## Lab rules (to stay productive)
+
+- Work in pairs (driver / navigator), switch every 15 minutes
+- Keep functions small (10–25 lines)
+- If stuck > 5 minutes:
+  - write down the exact error
+  - read it out loud
+  - then ask the instructor/TA
+- **Vibe coding (safe version):** Plan > Smallest Piece > Run > Commit.
+
+---
+
+## Task 0 — Create a “today branch” (optional)
+
+If you already know Git:
+
+```bash
+git checkout -b day2
+```
+
+If you don’t know Git yet: **skip this**.
+We’ll cover Git later this week.
+
+---
+
+## Task 1 — Add shared helpers (10 minutes)
+
+In `csv_profiler/profile.py` (or `src/csv_profiler/profile.py` if you’re using the src layout), add:
+
+- `is_missing(value)`
+- `try_float(value)`
+- `infer_type(values)`
+
+**Checkpoint:** you can call these from a Python REPL and they behave correctly.
+
+---
+
+## Solution — helpers (example) {.smaller}
+
+```python
+MISSING = {"", "na", "n/a", "null", "none", "nan"}
+
+def is_missing(value: str | None) -> bool:
+    if value is None:
+        return True
+    return value.strip().casefold() in MISSING
+
+def try_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+def infer_type(values: list[str]) -> str:
+    usable = [v for v in values if not is_missing(v)]
+    if not usable:
+        return "text"
+    for v in usable:
+        if try_float(v) is None:
+            return "text"
+    return "number"
+```
+
+---
+
+## Task 2 — Extract column values (10 minutes)
+
+Add a helper:
+
+```python
+def column_values(rows: list[dict[str, str]], col: str) -> list[str]:
+    ...
+```
+
+Rules:
+
+- return one value per row (use `row.get(col, "")`)
+- keep as strings (parsing happens later)
+
+::: aside
+`row.get(col, "")` means: “give me the value for this column, or `""` if the key is missing.”
+:::
+
+---
+
+## Solution — `column_values`
+
+```python
+def column_values(rows: list[dict[str, str]], col: str) -> list[str]:
+    return [row.get(col, "") for row in rows]
+```
+
+---
+
+## Task 3 — Numeric stats function (15 minutes)
+
+Implement:
+
+```python
+def numeric_stats(values: list[str]) -> dict:
+    """Compute stats for numeric column values (strings)."""
+    ...
+```
+
+Requirements:
+
+- ignore missing values
+- parse remaining values as floats
+- compute: `count`, `missing`, `unique`, `min`, `max`, `mean`
+
+---
+
+## Hint — numeric stats strategy {.smaller}
+
+1. `usable = [v for v in values if not is_missing(v)]`
+2. `nums = [try_float(v) for v in usable]`
+3. if any `None` → treat as text elsewhere (don’t call this function)
+4. compute stats:
+   - `count = len(nums)`
+   - `unique = len(set(nums))`
+   - `min(nums)`, `max(nums)`, `sum(nums)/count`
+
+
+::: callout-tip
+`set(nums)` removes duplicates. So `len(set(nums))` is “how many distinct values?”
+:::
+---
+
+## Solution — `numeric_stats` (example) {.smaller}
+
+```python
+def numeric_stats(values: list[str]) -> dict:
+    usable = [v for v in values if not is_missing(v)]
+    missing = len(values) - len(usable)
+    nums: list[float] = []
+    for v in usable:
+        x = try_float(v)
+        if x is None:
+            raise ValueError(f"Non-numeric value found: `{v}`")
+        nums.append(x)
+
+    count = len(nums)
+    unique = len(set(nums))
+    return {
+        "count": count,
+        "missing": missing,
+        "unique": unique,
+        "min": min(nums) if nums else None,
+        "max": max(nums) if nums else None,
+        "mean": (sum(nums) / count) if count else None,
+    }
+```
+
+::: aside
+We raise an error if something is non-numeric. That makes bugs loud.
+:::
+
+---
+
+## Task 4 — Text stats function (15 minutes)
+
+Implement:
+
+```python
+def text_stats(values: list[str], top_k: int = 5) -> dict:
+    ...
+```
+
+Requirements:
+
+- ignore missing values
+- compute: `count`, `missing`, `unique`
+- compute `top`: top_k most common values with counts
+
+---
+
+## Hint — counting text values
+
+You can implement counts with a dict:
+
+```python
+counts: dict[str, int] = {}
+for v in usable:
+    counts[v] = counts.get(v, 0) + 1
+```
+
+Then sort by count descending:
+
+```python
+top = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
+```
+
+---
+
+## Solution — `text_stats` (example) {.smaller}
+
+```python
+def text_stats(values: list[str], top_k: int = 5) -> dict:
+    usable = [v for v in values if not is_missing(v)]
+    missing = len(values) - len(usable)
+
+    counts: dict[str, int] = {}
+    for v in usable:
+        counts[v] = counts.get(v, 0) + 1
+
+    top_items = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
+    top = [{"value": v, "count": c} for v, c in top_items]
+
+    return {
+        "count": len(usable),
+        "missing": missing,
+        "unique": len(counts),
+        "top": top,
+    }
+```
+
+---
+
+## Task 5 — Upgrade `basic_profile` (20 minutes) {.smaller}
+
+Update `basic_profile(rows)` so it returns:
+
+- `source` (path optional for now)
+- `summary`: rows, columns
+- `columns`: a dict keyed by column name with:
+  - `type` (`number`/`text`)
+  - stats from `numeric_stats` or `text_stats`
+
+**Checkpoint:** `report["columns"]["age"]["type"] == "number"` (for your sample data).
+
+---
+
+## Solution — `basic_profile` (example) {.smaller}
+
+```python
+def basic_profile(rows: list[dict[str, str]]) -> dict:
+    cols = get_columns(rows)
+    report = {
+        "summary": {
+            "rows": len(rows),
+            "columns": len(cols),
+            "column_names": cols,
+        },
+        "columns": {},
+    }
+
+    for col in cols:
+        values = column_values(rows, col)
+        type_ = infer_type(values)
+        if type_ == "number":
+            stats = numeric_stats(values)
+        else:
+            stats = text_stats(values)
+        report["columns"][col] = {"type": type_, **stats}
+
+    return report
+```
+
+::: callout-tip
+`**stats` is a way to unpack a `dict` and copy all its items in a new `dict`. The same thing can be done for lists or any iterable but with a single asterisk (e.g., `["Majid", *names, "Sami"]`).
+:::
+
+---
+
+## Task 6 — Upgrade `write_markdown` (25 minutes) {.smaller}
+
+In `csv_profiler/render.py` (or `src/csv_profiler/render.py` if you’re using the src layout), update `write_markdown(report, path)` to include:
+
+1. Header block (`md_header(...)`)
+2. Summary bullets:
+   - rows, columns
+3. A table: one row per column (type, missing %, unique)
+4. Per-column details section:
+   - For numeric: min/max/mean
+   - For text: top values list
+
+---
+
+## Hint — computing missing percentage
+
+```python
+rows = report["summary"]["rows"]
+missing = col_report["missing"]
+missing_pct = (missing / rows) if rows else 0.0
+```
+
+---
+
+## Solution — `write_markdown` (example, simple) {.smaller}
+
+```python
+from pathlib import Path
+
+def write_markdown(report: dict, path: str | Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = report["summary"]["rows"]
+
+    lines: list[str] = []
+    lines.extend(md_header("data/sample.csv"))
+
+    lines.append("## Summary")
+    lines.append(f"- Rows: {rows:,}")
+    lines.append(f"- Columns: {report['summary']['columns']:,}")
+    lines.append("")
+
+    lines.append("## Columns (table)")
+    lines.extend(md_table_header())
+
+    for name, col in report["columns"].items():
+        missing_pct = (col["missing"] / rows) if rows else 0.0
+        lines.append(md_col_row(name, col["type"], col["missing"], missing_pct, col["unique"]))
+
+    lines.append("")
+    ... # continue to the next slide
+```
+
+::: aside
+The implementation continues on the next slide.
+:::
+
+---
+
+## Solution — `write_markdown` (example, simple) {.smaller}
+
+```python
+    ... # write_markdown() continues here
+    lines.append("## Column details")
+
+    for name, col in report["columns"].items():
+        lines.append(f"### `{name}` ({col['type']})")
+
+        if col["type"] == "number":
+            lines.append(f"- min: {col['min']}")
+            lines.append(f"- max: {col['max']}")
+            lines.append(f"- mean: {col['mean']}")
+        else:
+            top = col.get("top", [])
+            if not top:
+                lines.append("- (no non-missing values)")
+            else:
+                lines.append("- top values:")
+                for item in top:
+                    lines.append(f"  - `{item['value']}`: {item['count']}")
+
+        lines.append("")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+```
+
+::: callout-tip
+Keep it “simple but correct” today. We’ll polish the report formatting later.
+:::
+
+---
+
+## Task 7 — Run end-to-end (10 minutes) {.smaller}
+
+Run:
+
+- If you have `csv_profiler/` next to `main.py`:
+
+```bash
+uv run python main.py
+```
+
+- If you have a `src/` folder:
+
+  - Unix/macOS:
+
+```bash
+PYTHONPATH=src uv run python main.py
+```
+
+  - Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH="src"
+uv run python main.py
+```
+
+**Checkpoint:**
+- `outputs/report.json` has types and stats
+- `outputs/report.md` has a table and details
+
+---
+
+## Debug playbook (when it fails)
+
+1. Read the traceback **top to bottom**
+2. Find the first line that points to **your code**
+3. Print intermediate values:
+
+```python
+print("DEBUG values:", values[:5])
+```
+
+4. Confirm assumptions:
+- are you reading the file you think you are?
+- are there missing keys?
+- are strings like `" "` being treated as missing?
+
+---
+
+## Stretch (if you finish early)
+
+Pick **one**:
+
+- Add `median` (hint: sort and pick middle)
+- Add a “mostly numeric” rule (e.g., ≥ 90% parse as float)
+- Add a `--input` / `--output` argument using `argparse` *(Typer comes tomorrow)*
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**What made your profiler “better” today compared to Day 1?**
+
+---
+
+## What to do after class (Day 2 assignment) {.smaller}
+
+**Due:** before Day 3 starts (Tue, 16 Dec 2025)
+
+1. Add at least **2 new columns** to `data/sample.csv` (one numeric, one text)
+2. Rerun the profiler and check that:
+   - types are correct
+   - stats update correctly
+3. Improve your Markdown:
+   - format numeric values with `:.2f` where relevant
+   - show missing percentage in the table
+
+**Deliverable:** a zip or folder with your updated `csv-profiler/`.
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

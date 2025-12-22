@@ -1,0 +1,18 @@
+---
+title: "AI Pros Bootcamp"
+format: html
+---
+
+## Week 1: Python & Tooling
+##### [1. Python & Tooling](W1_Python/D1_Python_Tooling.qmd)
+##### [2. Functions + Files + Better Profiling](W1_Python/D2_Functions_Files.qmd)
+##### [3. Modules + OOP + Typer CLI](W1_Python/D3_Modules_OOP.qmd)
+##### [4. Streamlit GUI + (Optional) httpx](W1_Python/D4_Streamlit_GUI.qmd)
+##### [5. Git + GitHub + Ship Week 1](W1_Python/D5_Git_Project.qmd)
+
+## Week 2: Data Work (ETL + EDA)
+##### [1. Foundations for an Offline‑First Data Workflow](W2_Data/D1_Data_Workflow.qmd)
+##### [2. Data Quality + Cleaning Basics](W2_Data/D2_Quality_Cleaning.qmd)
+##### [3. Datetimes + Outliers + Safe Joins](W2_Data/D3_Datetimes_Outliers.qmd)
+##### [4. Practical EDA + Plotly + Bootstrap Uncertainty](W2_Data/D4_EDA_Plotly.qmd)
+##### [5. Ship the Pipeline + Reporting Handoff](W2_Data/D5_Pipeline_Handoff.qmd)

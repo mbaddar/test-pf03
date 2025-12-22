@@ -1,0 +1,1668 @@
+---
+pagetitle: "W1 D5"
+title: "Python & Tooling"
+subtitle: "AI Professionals Bootcamp | Week 1"
+date: 2025-12-18
+---
+
+# Day 5: Git + GitHub + Ship Week 1
+
+**Goal:** Publish a clean GitHub repo for your **CSV Profiler** (CLI + Streamlit) with a **clear README** and a reproducible setup.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** Today is “shipping day”. The technical work is mostly done — now we make it *reproducible* and *shareable*.
+
+**Do:** Show the end-state quickly:
+- open GitHub repo
+- run CLI once
+- run Streamlit once
+
+**Ask:** “What makes a repo feel ‘professional’ when you open it for the first time?”
+
+**Timebox:** 3 minutes.
+:::
+
+---
+
+## Today’s Flow
+
+- **Session 1 (60m):** Git essentials (trusted commit history)
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** GitHub (remote, push, README)
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Polish + submission readiness (runbook, checklist, pitfalls)
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Week 1 Project (due **11:59pm Thu**)
+
+---
+
+## Learning Objectives {.smaller}
+
+By the end of today, you can:
+
+- Explain Git’s mental model: **working tree → staging → commits**
+- Use core commands:
+  - `status`, `add`, `commit`, `log`, `diff`
+- Use “safe undo” tools:
+  - `restore`, `revert` (and when to avoid `reset`)
+- Create a GitHub repo and:
+  - add `origin`, `push`, `pull`
+- Write a README that lets anyone run:
+  - **CLI** profiling → JSON + Markdown
+  - **Streamlit** GUI → export JSON + Markdown
+- Submit your Week 1 project by **tonight, 11:59pm**
+
+---
+
+## Week 1 rules reminder (assessment week)
+
+::: callout-warning
+**No Generative AI for coding** this week.
+
+Allowed:
+- clarifying questions (concepts, error meaning, docs navigation)
+- official documentation
+- your notes + course slides
+
+Not allowed:
+- “write this code for me”
+- “fix my code” with pasted solutions
+- copying generated code into your repo
+:::
+
+::: {.notes}
+**Say:** This is about learning the *muscles* (debugging, reading errors, using docs).
+Next weeks you can move faster — but Week 1 is foundational.
+
+**Ask:** “What is a *clarifying* question you could ask today?”
+:::
+
+---
+
+## Certification policy (so you plan ahead)
+
+- **Certificate of completion**: end-of-bootcamp grade **≥ 70%**
+- **Certificate of attendance**: not passing, but **< 4 excused absences**
+
+::: aside
+Week 1 submission quality helps a lot later (capstone + job readiness).
+:::
+
+---
+
+## What you submit tonight (Week 1 deliverable) {.smaller}
+
+A public (or instructor-accessible) GitHub repository that contains:
+
+- Your `csv_profiler/` package (either `src/csv_profiler/` or `csv_profiler/` at repo root)
+- A working **CLI** that outputs:
+  - `report.json`
+  - `report.md`
+- A working **Streamlit app** that:
+  - loads a CSV
+  - previews profiling results
+  - exports JSON + Markdown
+- A **README** with “how to run” instructions
+- Clean Git hygiene:
+  - `.gitignore`
+  - reasonable commit history (not 1 giant commit)
+
+---
+
+## Quick refresher: running the project (and `PYTHONPATH`) {.smaller auto-animate=true}
+
+Today you will run **two entry points**:
+
+- **CLI** (command line): creates `report.json` + `report.md`
+- **Streamlit app** (browser UI): upload CSV + export reports
+
+### Setup commands you’ll see
+
+- `uv venv -p 3.11` creates a project virtual environment in `.venv/`
+- `uv pip install -r requirements.txt` installs the packages listed in `requirements.txt`
+
+---
+
+## Quick refresher: running the project (and `PYTHONPATH`) {.smaller auto-animate=true}
+
+Today you will run **two entry points**:
+
+- **CLI** (command line): creates `report.json` + `report.md`
+- **Streamlit app** (browser UI): upload CSV + export reports
+
+### Two tiny concepts
+
+- `python -m some_package.some_module` means: **run that module as a program**
+- If your code lives in `src/`, Python won’t find it automatically → we temporarily set `PYTHONPATH=src`
+
+::: callout-tip
+If you do **not** have a `src/` folder (your `csv_profiler/` folder is at repo root), you can **skip `PYTHONPATH`**.
+:::
+
+---
+
+## Quick refresher: running the project (and `PYTHONPATH`) {.smaller auto-animate=true}
+
+Today you will run **two entry points**:
+
+- **CLI** (command line): creates `report.json` + `report.md`
+- **Streamlit app** (browser UI): upload CSV + export reports
+
+### Set `PYTHONPATH` (only needed for `src/` layout)
+
+**Mac/Linux (bash/zsh)**
+
+```bash
+export PYTHONPATH=src
+```
+
+**Windows PowerShell**
+
+```powershell
+$env:PYTHONPATH="src"
+```
+
+::: aside
+With **uv**, you usually don’t need to “activate” the venv — `uv run ...` will use the project’s `.venv` automatically.
+:::
+
+---
+
+## What “done” looks like (acceptance test) {.smaller}
+
+From the repo root:
+
+**Mac/Linux (bash/zsh)**
+
+```bash
+uv venv -p 3.11
+uv pip install -r requirements.txt
+
+export PYTHONPATH=src # Only if you have a src/ folder
+
+uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+uv run streamlit run app.py
+```
+
+**Windows PowerShell**
+
+```powershell
+uv venv -p 3.11
+uv pip install -r requirements.txt
+
+$env:PYTHONPATH="src" # Only if you have a src/ folder
+
+uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+uv run streamlit run app.py
+```
+
+::: callout-tip
+If you do **not** have a `src/` folder, skip the `PYTHONPATH` lines.
+:::
+
+
+::: {.notes}
+**Say:** We grade with a “fresh clone” mindset. If your README works, you win.
+:::
+
+# Session 1
+
+::: {.muted}
+Git Essentials (commit history you can trust)
+:::
+
+---
+
+## Why Git exists (in one slide)
+
+Git gives you:
+
+- A **timeline** of your work (commits)
+- A safe way to **experiment** (branches)
+- A way to **collaborate** without overwriting (merges)
+- A permanent record you can show employers (GitHub)
+
+::: {.notes}
+**Ask:** “What’s worse: losing code, or losing *why* you wrote it?”
+:::
+
+---
+
+## Git mental model
+
+::: {.columns}
+::: {.column width="50%"}
+**Three places**
+
+1. **Working tree**
+   - files on your disk
+2. **Staging area**
+   - “what will be included next”
+3. **Repository**
+   - commits (history)
+:::
+
+::: {.column width="50%"}
+**Mini-diagram**
+
+```text
+edit files
+  ↓
+git add (stage)
+  ↓
+git commit (snapshot)
+  ↓
+git log (history)
+```
+:::
+:::
+
+**One rule:** only committed work is “saved”.
+
+---
+
+## Quick check
+
+**Question:** If you edited `app.py` but didn’t commit it… is it “saved”?
+
+. . .
+
+**Answer:** It’s only on your machine. Git history doesn’t know it yet.
+
+::: {.notes}
+**Say:** Git is not magic backup until you commit.
+:::
+
+---
+
+## Before you start: identity (one-time setup)
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+git config --global init.defaultBranch main
+```
+
+Check:
+
+```bash
+git config --list
+```
+
+::: {.notes}
+**Do:** Show where these settings live (global config).
+**Warn:** email should match GitHub email if possible.
+:::
+
+---
+
+## Start tracking a project
+
+From your repo root:
+
+```bash
+git init
+git status
+```
+
+You should see:
+
+- “On branch main” (or “master” → we will rename to `main`)
+- “No commits yet”
+- untracked files
+
+---
+
+## File states (the words you’ll see)
+
+- **Untracked** → Git doesn’t know it exists
+- **Modified** → changed since last commit
+- **Staged** → will be included in the next commit
+- **Committed** → safely in history
+
+---
+
+## `git status` is your “dashboard”
+
+Run it constantly:
+
+```bash
+git status
+```
+
+Practice reading:
+
+- what branch you’re on
+- what is staged
+- what is modified
+- what is untracked
+
+::: {.notes}
+**Say:** If you’re confused, run `git status` first.
+:::
+
+---
+
+## Staging: pick what goes into the next snapshot
+
+```bash
+git add README.md
+git add src/csv_profiler/cli.py
+```
+
+Or stage everything:
+
+```bash
+git add .
+```
+
+::: aside
+Prefer “small commits”: stage only what belongs together.
+:::
+
+---
+
+## View changes before you commit
+
+```bash
+git diff
+```
+
+View staged changes:
+
+```bash
+git diff --staged
+```
+
+::: {.notes}
+**Ask:** “Why is `git diff` a superpower?”
+:::
+
+---
+
+## Commit messages (simple rule)
+
+A good commit message:
+
+- is short (≤ 50 chars)
+- starts with a verb
+- describes the change
+
+Examples:
+
+- `Add Typer CLI entrypoint`
+- `Render Markdown report`
+- `Fix numeric parsing for empty strings`
+
+---
+
+## `.gitignore` (protect your repo)
+
+You usually should NOT commit:
+
+- `.venv/` (virtual env)
+- `__pycache__/`
+- `outputs/` (generated reports)
+- `.env` (secrets)
+
+If you commit these, your repo becomes:
+- huge
+- noisy
+- sometimes unsafe
+
+---
+
+## Example `.gitignore` for this project {.smaller}
+
+```gitignore
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual env
+.venv/
+
+# Local outputs
+outputs/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Secrets (later weeks)
+.env
+```
+
+::: callout-tip
+Sometimes Python creates `__pycache__/` and `*.py[cod]` in your local machine to help it run your code faster. These files are specific to your machine, so keep them local and don’t commit them.
+:::
+
+::: callout-note
+`*.py[cod]` meens any file that has the extension `*.pyc`, `*.pyo`, or `*.pyd`.
+:::
+
+::: {.notes}
+**Say:** Generated files are okay locally — but keep Git history clean.
+:::
+
+---
+
+## Task — Create `.gitignore` (8 minutes)
+
+1. Create a `.gitignore` file in the repo root
+2. Add rules for:
+   - `.venv/`
+   - `__pycache__/`
+   - `outputs/`
+3. Verify:
+
+```bash
+git status
+```
+
+**Checkpoint:** `git status` no longer lists `.venv/` contents.
+
+---
+
+## Solution — `.gitignore`
+
+Create `.gitignore`:
+
+```gitignore
+__pycache__/
+.venv/
+outputs/
+.env
+.DS_Store
+Thumbs.db
+```
+
+Then:
+
+```bash
+git add .gitignore
+git commit -m "Add .gitignore"
+```
+
+---
+
+## History: what commits look like
+
+```bash
+git log
+```
+
+A compact view:
+
+```bash
+git log --oneline --decorate --graph --all
+```
+
+::: {.notes}
+**Do:** Explain: each line is a snapshot.
+:::
+
+---
+
+## Safe undo (don’t panic)
+
+Undo unstaged changes (restore file from last commit):
+
+```bash
+git restore app.py
+```
+
+Unstage a staged file:
+
+```bash
+git restore --staged app.py
+```
+
+::: callout-warning
+Avoid `git reset --hard` unless you *really* know what you’re doing.
+:::
+
+---
+
+## Undoing commits: `revert` vs `reset`
+
+| Tool | What it does | Safe after pushing? | Use it when |
+|---|---|---:|---|
+| `git revert <hash>` | Creates a new commit that undoes changes | ✅ | You already pushed a bad commit |
+| `git reset --hard <hash>` | Moves branch pointer + rewrites history | ❌ | You have **not** pushed yet |
+
+::: aside
+Default choice on shared branches: **revert**.
+:::
+
+---
+
+## Inspect an old version (without changing your files)
+
+Show a file at a previous commit:
+
+```bash
+git show <hash>:src/csv_profiler/cli.py
+```
+
+Show details of a commit:
+
+```bash
+git show <hash>
+```
+
+---
+
+## Mini-quiz
+
+You pushed a commit that breaks the CLI. You want to undo it safely.
+
+A. `git reset --hard HEAD~1`  
+B. `git revert HEAD`
+
+. . .
+
+**Answer:** B (`git revert`) on shared branches.
+
+---
+
+## “I committed the wrong thing” (common fixes) {.smaller}
+
+Rename last commit message (no new content):
+
+```bash
+git commit --amend -m "Better message"
+```
+
+Add a missed file to the last commit:
+
+```bash
+git add missed_file.py
+git commit --amend --no-edit
+```
+
+Stop tracking a file **without deleting it** (useful after fixing `.gitignore`):
+
+```bash
+git rm --cached path/to/file
+# folders need -r:
+git rm -r --cached outputs/
+git commit -m "Stop tracking generated files"
+```
+
+::: callout-warning
+Only amend commits that you have **not** pushed yet.
+
+Be careful: `git rm` **without** `--cached` deletes the file.
+:::
+
+---
+
+## Branches (why you should care)
+
+A branch is:
+
+- a named pointer to a commit
+- a way to isolate work
+
+Common workflow:
+
+- `main`: stable
+- `feature/...`: new work
+
+---
+
+## Branch naming (make it readable) {.smaller}
+
+Good patterns:
+
+- `feature/<short-name>`
+- `fix/<short-name>`
+- `docs/<short-name>`
+
+Avoid:
+
+- `test`
+- `final_final2`
+- `wip`
+
+::: aside
+Branches are communication.
+:::
+
+---
+
+## Create / switch branches: `git switch`
+
+You will see **two actions**:
+
+- **create a new branch** (for new work)
+- **switch** between branches (to see different versions of your files)
+
+```bash
+git switch -c feature/readme   # create + switch
+git switch main                # switch back
+```
+
+::: callout-tip
+If your Git is old and doesn’t support `git switch`, use:
+
+```bash
+git checkout -b feature/readme
+git checkout main
+```
+:::
+
+---
+
+## Optional: `git stash` (park work temporarily)
+
+When you must switch context but you’re not ready to commit:
+
+```bash
+git stash -u
+git switch main
+# ...
+git stash pop
+```
+
+::: callout-warning
+Use stash short-term. Prefer commits for real progress.
+:::
+
+---
+
+## Mini-task — Make a feature branch (7 minutes)
+
+1. Create a new branch:
+   - `feature/readme`
+2. Add 5 lines to your README
+3. Commit
+4. Merge back into `main`
+
+**Checkpoint:** `git log --oneline --graph` shows a merge.
+
+---
+
+## Solution — Branch + merge
+
+```bash
+git switch -c feature/readme
+# edit README.md
+git add README.md
+git commit -m "Improve README quickstart"
+
+git switch main
+git merge feature/readme
+```
+
+---
+
+## Recap (Session 1)
+
+- Git is a system of **snapshots**
+- Use `status` + `diff` to stay oriented
+- Commit small, meaningful units
+- `.gitignore` keeps repos clean
+- Learn **safe undo** before you need it
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we will learn about GitHub.
+
+# Session 2
+
+::: {.muted}
+GitHub Workflow (remote, push, README)
+:::
+
+---
+
+## Git vs GitHub
+
+- **Git**: version control tool on your machine
+- **GitHub**: a hosted place to store Git repos + collaborate
+
+Think of GitHub as: “Google Drive for Git repos” (but with workflows).
+
+---
+
+## Clone vs “Download ZIP”
+
+Prefer **clone** because:
+
+- you keep Git history
+- you can commit + push easily
+- you can pull updates later
+
+Clone:
+
+```bash
+git clone <REPO_URL>
+cd csv-profiler
+```
+
+---
+
+## Forks and Pull Requests (PRs)
+
+- **Fork**: your copy of someone else’s repo
+- **Pull Request (PR)**: request to merge changes into a branch
+
+Even solo, PRs can be useful for:
+- review before merging into `main`
+- discussion + feedback
+
+---
+
+## Mini-quiz
+
+What does `origin` mean?
+
+A. Your current branch  
+B. The default remote name  
+C. A GitHub feature
+
+. . .
+
+**Answer:** B — it’s the default remote name (just a label).
+
+---
+
+## Remote basics: `origin`
+
+A “remote” is a named URL.
+
+You usually have:
+
+- `origin` → your GitHub repo
+
+Check:
+
+```bash
+git remote -v
+```
+
+---
+
+## Create a GitHub repository (checklist)
+
+On GitHub:
+
+- New repository
+- Name: `csv-profiler` (example)
+- Add description
+- Choose Public/Private (based on instructions)
+- **Do not** add a README if you already have one locally (either is fine, but avoid confusion)
+
+::: {.notes}
+**Do:** Show the page where GitHub gives you the `git remote add origin ...` line.
+:::
+
+---
+
+## Connect local → GitHub
+
+Copy the URL from GitHub, then:
+
+```bash
+git remote add origin <YOUR_REPO_URL>
+git branch -M main
+git push -u origin main
+```
+
+Now your future pushes can be:
+
+```bash
+git push
+```
+
+---
+
+## Quick check: correct order?
+
+Which comes first?
+
+A. `git push`  
+B. `git remote add origin ...`  
+
+. . .
+
+**Answer:** Add remote first (`git remote add origin ...`), then push.
+
+---
+
+## Authentication (what usually breaks)
+
+If you see authentication errors:
+
+- HTTPS:
+  - you may need a **Personal Access Token (PAT)** instead of a password
+- SSH:
+  - you need an SSH key added to GitHub
+
+::: callout-tip
+Ask a *clarifying* question to the instructor if auth blocks you. Don’t spend 30 minutes stuck.
+:::
+
+---
+
+## Pulling updates (even if you work alone)
+
+Before starting work each day:
+
+```bash
+git pull
+```
+
+If you are behind, Git updates your local branch.
+
+---
+
+## README: your repo’s “front door”
+
+A good README answers:
+
+- What is this?
+- What can it do?
+- How do I install dependencies?
+- How do I run it?
+- What does output look like?
+
+---
+
+## README skeleton (copyable) {.smaller}
+
+```markdown
+# CSV Profiler
+
+Generate a profiling report for a CSV file.
+
+## Features
+- CLI: JSON + Markdown report
+- Streamlit GUI: upload CSV + export reports
+
+## Setup
+    uv venv -p 3.11
+    uv pip install -r requirements.txt
+
+## Run CLI
+    # If you have a src/ folder:
+    #   Mac/Linux: export PYTHONPATH=src
+    #   Windows:   $env:PYTHONPATH="src"
+    uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+
+## Run GUI
+    # If you have a src/ folder:
+    #   Mac/Linux: export PYTHONPATH=src
+    #   Windows:   $env:PYTHONPATH="src"
+    uv run streamlit run app.py
+```
+
+::: {.notes}
+**Say:** Make it runnable in 60 seconds. Minimal + clear beats “fancy”.
+:::
+
+---
+
+## Task — Improve your README (10 minutes)
+
+Add these sections:
+
+- `## Setup`
+- `## Run CLI`
+- `## Run GUI`
+- `## Output Files`
+
+**Checkpoint:** A new student can follow your README without asking you questions.
+
+---
+
+## Solution — README “Output Files” section
+
+```markdown
+## Output Files
+
+The CLI writes:
+- `outputs/report.json`
+- `outputs/report.md`
+
+The Streamlit app can:
+- preview the report
+- download JSON + Markdown
+```
+
+Then commit:
+
+```bash
+git add README.md
+git commit -m "Document setup and usage"
+```
+
+---
+
+## Add one screenshot (optional but strong)
+
+- Take a screenshot of your Streamlit app (small)
+- Add it to `assets/` or `images/`
+- Reference it in README:
+
+```markdown
+![Streamlit UI](images/ui.png)
+```
+
+::: aside
+A screenshot makes your project feel “real” instantly.
+:::
+
+---
+
+## Repo hygiene (professional signal)
+
+- Keep secrets out (`.env` in `.gitignore`)
+- Keep big data out (or use a tiny sample)
+- Keep generated outputs out (`outputs/` ignored)
+- Keep instructions up to date
+
+---
+
+## Recap (Session 2)
+
+- GitHub hosts your Git repo
+- `origin` is the remote name you’ll use most
+- Your README is part of the grade (and your portfolio)
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:**  We will polish our project.
+
+# Session 3
+
+::: {.muted}
+Polish + Submission Readiness
+:::
+
+---
+
+## Definition of Done (Week 1)
+
+You’re “done” when:
+
+- CLI works from a fresh terminal
+- Streamlit app runs and exports reports
+- Repo has:
+  - `.gitignore`
+  - `requirements.txt` (or equivalent)
+  - README with run steps
+- GitHub has your latest commit (push succeeded)
+
+---
+
+## “Fresh clone” runbook (what graders do)
+
+We will roughly do:
+
+1. `git clone ...`
+2. create env
+3. install deps
+4. run CLI on `data/sample.csv`
+5. run Streamlit
+
+If any step is confusing → points lost.
+
+---
+
+## Your `data/sample.csv` should prove your app works
+
+Include a tiny CSV with:
+
+- a numeric column
+- a text column
+- at least one missing value
+- at least 5–10 rows
+
+::: aside
+Small file = fast grading.
+:::
+
+---
+
+## Add a “Troubleshooting” section (saves you messages) {.smaller}
+
+**Examples:**
+
+- If imports fail:
+  - confirm you are in the **repo root**
+  - if your code is under `src/`, set `PYTHONPATH=src`
+    - Mac/Linux: `export PYTHONPATH=src`
+    - Windows PowerShell: `$env:PYTHONPATH="src"`
+- If Streamlit can’t import your package:
+  - stop + restart Streamlit
+  - confirm you launched it from the **repo root**
+- If `uv` commands fail:
+  - confirm you ran `uv venv` in the repo
+  - confirm `.venv/` exists
+
+
+---
+
+## Task — Add a 5-step manual test plan (6 minutes)
+
+In README, add:
+
+1. setup
+2. run CLI
+3. verify output files
+4. run Streamlit
+5. export reports
+
+**Checkpoint:** Another student can run it in < 2 minutes.
+
+---
+
+## Solution — Manual test plan (README snippet) {.smaller}
+
+```markdown
+## Manual Test Plan
+
+1. Setup:
+   - `uv venv -p 3.11`
+   - `uv pip install -r requirements.txt`
+
+2. CLI:
+   - (If you have a `src/` folder: set `PYTHONPATH=src` first)
+   - `uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs`
+
+3. Verify:
+   - `outputs/report.json` and `outputs/report.md` exist
+
+4. GUI:
+   - (If you have a `src/` folder: set `PYTHONPATH=src` first)
+   - `uv run streamlit run app.py`
+
+5. Export:
+   - download JSON + Markdown from the UI
+```
+
+
+---
+
+## Freeze dependencies (simple, practical) {.smaller}
+
+`requirements.txt` is a **plain text** list of the packages (and versions) your project needs.
+
+- `uv pip freeze` prints “what’s installed” in your project environment
+- `>` means “write this output into a file” (it will overwrite the file)
+
+From the repo root (where your `.venv/` is):
+
+```bash
+uv pip freeze > requirements.txt
+```
+
+Then commit:
+
+```bash
+git add requirements.txt
+git commit -m "Add requirements.txt"
+```
+
+::: aside
+This makes your setup reproducible even if someone doesn’t know your install history.
+:::
+
+---
+
+## Quick check
+
+**Question:** Should `requirements.txt` include your `.venv/`?
+
+. . .
+
+**Answer:** No. `requirements.txt` is text. `.venv/` stays untracked.
+
+---
+
+## Add a tiny “smoke test” section in README {.smaller}
+
+**Example:**
+
+```markdown
+## Smoke Test
+
+1) Run the CLI:
+
+    # If you have a `src/` folder: set `PYTHONPATH=src` first
+    uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+
+2) Check the output files exist:
+
+    # Mac/Linux
+    ls outputs
+
+    # Windows PowerShell
+    dir outputs
+
+You should see `report.json` and `report.md`.
+```
+
+
+---
+
+## Don’t commit secrets (future-you will thank you) {.smaller}
+
+Bad:
+
+- API keys in code
+- tokens in README
+- `.env` committed
+
+Good:
+
+- `.env` in `.gitignore`
+- `.env.example` committed (no secrets)
+
+::: callout-warning
+Once a secret is in Git history, removing it is hard. Treat repos as public.
+:::
+
+---
+
+## Common Week 1 submission pitfalls
+
+- “It works on my machine” (but README doesn’t)
+- No sample CSV (grader can’t run)
+- Pushed `.venv/` or huge files
+- CLI crashes on:
+  - empty strings
+  - missing values
+  - weird headers
+- Streamlit app only works after manual steps not documented
+
+---
+
+## Grading rubric (transparent)
+
+| Area | Points | What we look for |
+|---|---:|---|
+| CLI works | 30 | Reads CSV, writes JSON + MD, helpful errors |
+| Streamlit works | 30 | Upload CSV, preview, export JSON + MD |
+| Code quality | 15 | Clear functions/modules, reasonable naming |
+| Reproducibility | 15 | README + requirements, fresh-clone runnable |
+| Git/GitHub hygiene | 10 | commits, `.gitignore`, pushed on time |
+
+**Passing (Week 1):** ≥ 70/100
+
+::: {.notes}
+**Say:** Points are easiest to earn with a good README + clean runbook.
+:::
+
+---
+
+## Merge conflicts (you will see this eventually)
+
+Conflict happens when:
+
+- you and Git both changed the same lines
+- Git can’t automatically decide which is correct
+
+Signs:
+
+- `CONFLICT (content)` message
+- file contains `<<<<<<<`, `=======`, `>>>>>>>`
+
+---
+
+## How to resolve a conflict (safe process)
+
+1. Read `git status`
+2. Open the conflicting file
+3. Choose the correct lines (remove markers)
+4. Save file
+5. `git add <file>`
+6. `git commit`
+
+---
+
+## Mini-exercise — Simulate a conflict (10 minutes)
+
+1. Create a branch: `feature/conflict`
+2. Change the same line in `README.md`
+3. Commit on branch
+4. Switch to `main`
+5. Change the same line differently
+6. Commit on `main`
+7. Merge branch into `main` → conflict appears
+8. Resolve and commit
+
+---
+
+## Solution — Conflict simulation (commands)
+
+```bash
+git switch -c feature/conflict
+# edit README.md (change SAME line)
+git add README.md
+git commit -m "Edit README on branch"
+
+git switch main
+# edit README.md (change SAME line differently)
+git add README.md
+git commit -m "Edit README on main"
+
+git merge feature/conflict
+# resolve file
+git add README.md
+git commit -m "Resolve merge conflict"
+```
+
+---
+
+## Recap (Session 3)
+
+- Think like a grader: “fresh clone”
+- Freeze deps (`requirements.txt`)
+- Protect secrets
+- Know the conflict workflow
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we will finalize the project.
+
+# Hands-on
+
+::: {.muted}
+Week 1 Project — Finalize + Push
+:::
+
+---
+
+## Hands-on kickoff
+
+**Goal:** Push a polished Week 1 repo by **tonight, 11:59pm**.
+
+**Deliverable:** A Gib link that anyone can run.
+
+**Work style:**
+- work in pairs (review each other’s README + commands)
+- ask instructors *clarifying* questions quickly
+
+::: {.notes}
+**Do:** Put a visible timer. Encourage small commits every ~15 minutes.
+:::
+
+---
+
+## Task 0 — Ensure a runnable sample CSV exists (8 minutes)
+
+- Confirm `data/sample.csv` exists
+- Keep it small (≤ ~20 rows)
+- Include:
+  - a numeric column
+  - a text column
+  - at least one missing value
+
+**Checkpoint:** Your repo can be tested without extra files.
+
+---
+
+## Solution — Commit your sample CSV
+
+```bash
+git add data/sample.csv
+git commit -m "Add sample CSV for grading"
+```
+
+::: aside
+If you can’t share real data, create a synthetic sample.
+:::
+
+---
+
+## Task 1 — Final local smoke test (10 minutes) {.smaller}
+
+Run both (from repo root):
+
+**Mac/Linux (bash/zsh)**
+
+```bash
+# Only if you have a src/ folder:
+export PYTHONPATH=src
+
+uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+uv run streamlit run app.py
+```
+
+**Windows PowerShell**
+
+```powershell
+# Only if you have a src/ folder:
+$env:PYTHONPATH="src"
+
+uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+uv run streamlit run app.py
+```
+
+**Checkpoint:** Both run without editing code.
+
+
+---
+
+## Solution — Task 1 checklist
+
+- CLI produced:
+  - `outputs/report.json`
+  - `outputs/report.md`
+- Streamlit:
+  - uploads `sample.csv`
+  - shows a preview
+  - download buttons work
+
+If one fails: fix it before touching GitHub.
+
+---
+
+## Task 2 — Create `requirements.txt` (10 minutes)
+
+```bash
+uv pip freeze > requirements.txt
+```
+
+**Checkpoint:** file exists and is not empty.
+
+---
+
+## Solution — Task 2
+
+Commit:
+
+```bash
+git add requirements.txt
+git commit -m "Add requirements.txt"
+```
+
+---
+
+## Task 3 — Ensure `.gitignore` is correct (10 minutes)
+
+Verify these are NOT tracked:
+
+- `.venv/`
+- `outputs/`
+- `__pycache__/`
+
+Check:
+
+```bash
+git status
+git ls-files | head
+```
+
+---
+
+## Solution — Task 3 (fix accidental tracking)
+
+If you already committed `.venv/` or `outputs/` by mistake:
+
+```bash
+git rm -r --cached .venv outputs __pycache__
+git commit -m "Stop tracking generated files"
+```
+
+Then ensure `.gitignore` contains those patterns.
+
+---
+
+## Task 4 — README “fresh clone” instructions (15 minutes)
+
+Your README must include:
+
+- setup steps
+- CLI command
+- Streamlit command
+- expected outputs
+
+**Checkpoint:** Your partner can follow it without help.
+
+---
+
+## Solution — Task 4 (minimum README) {.smaller}
+
+```markdown
+## Setup
+uv venv -p 3.11
+uv pip install -r requirements.txt
+
+## Run CLI
+# If you have a src/ folder:
+#   Mac/Linux: export PYTHONPATH=src
+#   Windows:   $env:PYTHONPATH="src"
+uv run python -m csv_profiler.cli profile data/sample.csv --out-dir outputs
+
+## Run GUI
+# If you have a src/ folder:
+#   Mac/Linux: export PYTHONPATH=src
+#   Windows:   $env:PYTHONPATH="src"
+uv run streamlit run app.py
+```
+
+Commit:
+
+```bash
+git add README.md
+git commit -m "Finalize README runbook"
+```
+
+
+---
+
+## Task 5 — Create GitHub repo + push (15 minutes)
+
+1. Create repo on GitHub
+2. Add remote
+3. Push
+
+**Checkpoint:** You can open GitHub and see your files.
+
+---
+
+## Solution — Task 5 (push commands)
+
+```bash
+git remote add origin <YOUR_REPO_URL>
+git branch -M main
+git push -u origin main
+```
+
+If you already had a remote but it’s wrong:
+
+```bash
+git remote set-url origin <YOUR_REPO_URL>
+git push -u origin main
+```
+
+---
+
+## Git tags (bookmark a commit)
+
+A **tag** is a human-friendly name for a specific commit.
+
+- It does **not** change your code
+- It makes grading / “submission versions” easy to find later
+- You can push a tag to GitHub just like a branch
+
+Generic pattern:
+
+```bash
+git tag -a <tag-name> -m "message"
+git push origin <tag-name>
+```
+
+---
+
+## Task 6 — Tag your Week 1 submission (optional, 8 minutes)
+
+Create a “submission tag” so it’s easy to find:
+
+```bash
+git tag -a week1-submission -m "Week 1 submission"
+git push origin week1-submission
+```
+
+**Checkpoint:** GitHub shows the tag under Releases/Tags.
+
+---
+
+## Solution — Task 6 (when tags fail)
+
+If push is rejected, first push commits:
+
+```bash
+git push
+git push origin week1-submission
+```
+
+---
+
+## Task 7 — Final sanity check from GitHub (10 minutes) {.smaller}
+
+On GitHub:
+
+- open README (renders correctly)
+- verify file tree:
+  - `src/csv_profiler/...`
+  - `app.py`
+  - `requirements.txt`
+  - `.gitignore`
+  - `data/sample.csv`
+
+**Checkpoint:** Repo looks “professional”.
+
+---
+
+## Solution — Task 7 (ideal structure) {auto-animate=true}
+
+**Option A: `src/` layout (common in bootcamps)**
+
+```text
+csv-profiler/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── app.py
+├── data/
+│   └── sample.csv
+├── outputs/          (ignored)
+└── src/
+    └── csv_profiler/
+        ├── __init__.py
+        ├── cli.py
+        ├── io.py
+        ├── profiling.py
+        └── render.py
+```
+
+---
+
+## Solution — Task 7 (ideal structure) {auto-animate=true}
+
+**Option B: “flat” layout (also acceptable for Week 1)**
+
+```text
+csv-profiler/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── app.py
+├── data/
+│   └── sample.csv
+├── outputs/          (ignored)
+└── csv_profiler/
+    ├── __init__.py
+    ├── cli.py
+    ├── io.py
+    ├── profiling.py
+    └── render.py
+```
+
+::: aside
+If you use Option B, your run commands usually don’t need `PYTHONPATH`.
+:::
+
+
+---
+
+## Task 8 — Submission message (5 minutes)
+
+Send the following to the instructor/portal:
+
+- GitHub repo link
+- Commit hash of your final submission
+- Any known limitations (1–2 bullets)
+
+**Checkpoint:** Submission sent before **11:59pm**.
+
+---
+
+## Solution — Task 8 template
+
+```text
+Repo: https://github.com/<user>/csv-profiler
+Final commit: <hash>
+Limitations:
+- Does not infer dates (treated as text)
+- Very large CSVs may be slow
+```
+
+---
+
+## If you finish early (stretch goals)
+
+Pick ONE:
+
+- Add better type inference: `int` vs `float`
+- Add missing-value % per column
+- Add a “Top values” section for categorical columns
+- Add a `--delimiter` option in CLI
+- Improve Streamlit UI (tabs, nicer layout)
+
+::: {.notes}
+**Say:** Stretch only after the main rubric is satisfied.
+:::
+
+---
+
+## Week 1 wrap-up
+
+You can now:
+
+- build and run Python projects with `uv`
+- write a CLI (Typer) and a GUI (Streamlit)
+- read CSV → generate JSON + Markdown reports
+- ship to GitHub with clean version control
+
+Next week: **Data Work (ETL + EDA)**
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+- What is the difference between **staging** and **committing**?
+- What is one thing you improved in your README today?
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

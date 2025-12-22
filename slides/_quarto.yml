@@ -1,0 +1,47 @@
+quarto-required: ">= 1.8.26"
+
+project:
+  type: website
+  title: "AI Pros Bootcamp"
+  output-dir: .quarto/output
+  execute-dir: project
+  brand: assets/_brand.yml
+  render:
+    - "W*/*.qmd"
+    - "./index.qmd"
+    - "!**/README.md"
+  preview:
+    port: 4200
+    browser: false
+
+execute:
+  echo: false
+  warning: false
+  message: false
+
+format:
+  revealjs:
+    author-meta: "malfadly@sdaia.gov.sa"
+    slide-number: c/t
+    show-slide-number: all
+    preview-links: true
+    transition: slide
+    background-transition: fade
+    chalkboard: false
+    multiplex: false
+    help: false
+    progress: true
+    history: false
+    hide-inactive-cursor: true
+    strip-comments: true
+    center: false
+    incremental: false
+    code-copy: true
+    code-line-numbers: true
+    pdf-separate-fragments: false
+    plugins: [menu]
+    menu:
+      custom:
+        - title: "Index"
+          icon: "<svg width='1.8rem' viewBox='0 0 24 24'><path d='M5 7h14M5 12h14M5 17h7' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+          src: "../index.html"

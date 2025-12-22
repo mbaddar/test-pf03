@@ -1,0 +1,1631 @@
+---
+pagetitle: "W1 D3"
+title: "Python & Tooling"
+subtitle: "AI Professionals Bootcamp | Week 1"
+date: 2025-12-16
+---
+
+# Day 3: Modules + OOP + Typer CLI
+
+**Goal:** Turn your profiler into a **clean Python package** and expose it as a **real CLI**.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** Today is a turning point: we stop writing “one big script” and start writing *software*.
+
+**Do:** Quick show of hands: who can run Day 2 and get `report.json` + `report.md`?
+
+**Ask:** “What feels harder: imports, classes, or CLI arguments?”
+
+**Timebox:** 3 minutes.
+:::
+
+---
+
+## Today’s Flow
+
+- **Session 1 (60m):** Modules + packages
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** OOP essentials
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Typer: build a CLI from type hints
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Project: package + CLI + errors
+
+---
+
+## Learning Objectives {.smaller}
+
+By the end of today, you can:
+
+- Explain the difference between a **module** and a **package**
+- Fix imports by understanding **`sys.path`** and `PYTHONPATH`
+- Use core modules: `os`, `sys`, `time`, `shutil`
+- Write a small class using **properties** to enforce constraints
+- Explain (and recognize) **inheritance** and **polymorphism**
+- Build a multi-command **Typer** CLI with `--help`
+- Ship a CLI that generates **JSON + Markdown** reports
+
+---
+
+## Warm-up (5 minutes) {.smaller auto-animate=true}
+
+Run your Day 2 project (whatever layout you have right now).
+
+1) Go to your project folder
+
+```bash
+cd ~/bootcamp/csv-profiler
+```
+
+2) Run it
+
+If you already have a `src/` folder (**src-layout**):
+
+```bash
+PYTHONPATH=src uv run python main.py
+```
+
+If you do **not** have a `src/` folder yet (**flat-layout**):
+
+```bash
+uv run python main.py
+```
+
+---
+
+## Warm-up (5 minutes) {.smaller auto-animate=true}
+
+Run your Day 2 project (whatever layout you have right now).
+
+**Windows PowerShell (src-layout):**
+
+```powershell
+cd $HOME\bootcamp\csv-profiler
+$env:PYTHONPATH="src"
+uv run python main.py
+```
+
+**Windows PowerShell (flat-layout):**
+
+```powershell
+cd $HOME\bootcamp\csv-profiler
+uv run python main.py
+```
+
+**Checkpoint:** `outputs/report.json` and `outputs/report.md` are updated.
+
+---
+
+## Week project progress {.smaller}
+
+You already have:
+
+- A working profiler
+- Type inference (`number` vs `text`)
+- Numeric stats for numeric columns
+- Clean-ish Markdown and JSON exports
+
+Today you will add:
+
+- **Package structure** (`src/csv_profiler/...`)
+- A **CLI** (Typer) that accepts input/output paths
+- Better **error handling** + helpful messages
+- A tiny bit of **timing** (how long profiling takes)
+
+::: aside
+This is what makes your work gradeable and reproducible.
+:::
+
+# Session 1
+
+::: {.muted}
+Modules + packages + built-in modules
+:::
+
+---
+
+## Session 1 objectives
+
+- Understand how Python finds code to import
+- Create and import your own modules
+- Use built-in modules to interact with the OS
+
+---
+
+## Vocabulary: module vs package
+
+- **Module**: one `.py` file
+  - Example: `profiling.py`
+- **Package**: a folder of modules
+  - Example: `csv_profiler/` with `__init__.py`
+
+**Why packages?**
+
+- organize code by responsibility
+- reuse code across scripts
+- easier testing and maintenance
+
+---
+
+## What happens when you `import something`?
+
+Python searches for `something` in this order:
+
+1. Built-in modules
+2. Installed packages (your environment)
+3. Your project paths (current folder + `sys.path`)
+
+**Debug tool:**
+
+```python
+import sys
+print(sys.path)
+```
+
+::: aside
+If you understand `sys.path`, you can debug most import problems.
+:::
+
+---
+
+## Quick demo: check your import paths
+
+Create `debug_paths.py`:
+
+```python
+import sys
+
+print("sys.path (where Python looks for imports):")
+for p in sys.path:
+    print(" -", p)
+```
+
+Run:
+
+```bash
+uv run python debug_paths.py
+```
+
+**Question:** Do you see your project root? Do you see `.../.venv/...`?
+
+---
+
+## Environment variables (quick idea)
+
+- Environment variables are **key/value strings** set in your terminal (outside Python).
+- They are inherited by programs you run from that terminal.
+- We'll use one today: **`PYTHONPATH`** (adds folders to Python's import search).
+
+::: callout-tip
+You don't need to memorize many environment variables.
+Today we only care about `PYTHONPATH`.
+:::
+
+---
+
+## `PYTHONPATH`: add folders to import search
+
+If your code lives in `src/`, add it to the path:
+
+- Unix/macOS:
+
+```bash
+PYTHONPATH=src uv run python main.py
+```
+
+- Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH="src"
+uv run python main.py
+```
+
+::: callout-tip
+This is the simplest way to use a `src/` layout before we finalize packaging.
+:::
+
+---
+
+## Import styles (use intentionally) {.smaller}
+
+:::: {.columns}
+::: {.column width="45%"}
+**Good defaults**
+
+- `import csv`
+- `import json`
+- `from pathlib import Path`
+
+Why?
+
+- keeps namespace clean
+- avoids name collisions
+:::
+
+::: {.column width="55%"}
+**Also okay (be explicit)**
+
+- `import numpy as np` (common convention)
+- `import utilities.arithmetic.units as convert`
+
+Avoid:
+
+- `from module import *` (hides names)
+:::
+::::
+
+---
+
+## `__name__ == "__main__"`: run vs import
+
+A file can be:
+
+- **imported** (used as a library)
+- **executed** (run as a program)
+
+Pattern:
+
+```python
+def main() -> None:
+    ...
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Run a module with `-m`
+
+Instead of:
+
+```bash
+uv run python src/csv_profiler/cli.py
+```
+
+Prefer:
+
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli --help
+```
+
+Why?
+
+- imports work more predictably
+- you run the module “as part of a package”
+
+---
+
+## Project structure we want (by end of today)
+
+```text
+csv-profiler/
+├── data/
+│   └── sample.csv
+├── outputs/
+├── src/
+│   └── csv_profiler/
+│       ├── __init__.py
+│       ├── io.py
+│       ├── profiling.py
+│       ├── render.py
+│       └── cli.py
+└── pyproject.toml
+```
+
+::: aside
+Each file gets one job.
+:::
+
+---
+
+## One job per module (recommended)
+
+- `io.py`
+  - read CSV → list of rows (`list[dict[str, str]]`)
+- `profiling.py`
+  - compute column stats → Python dicts/classes
+- `render.py`
+  - convert report → Markdown string
+- `cli.py`
+  - parse args + call your library
+
+---
+
+## Built-in modules you’ll use today
+
+**System & OS**
+
+- `os` → environment variables, current directory
+- `sys` → argv, stdin/out, import path
+- `time` → measure runtime, timestamps
+- `shutil` → file operations + check if tools exist
+
+::: callout-tip
+These are "glue" modules that make your Python code behave like a real tool.
+:::
+
+---
+
+## `os`: environment + current folder
+
+```python
+import os
+
+print("PWD:", os.getcwd())
+print("HOME:", os.environ.get("HOME"))
+print("CSV_PATH:", os.environ.get("CSV_PATH"))
+```
+
+Use cases:
+
+- read config like `OUTPUT_DIR`
+- debug “where am I running from?”
+
+---
+
+## `sys`: argv + exit codes
+
+```python
+import sys
+
+print(sys.argv)   # list of strings
+sys.exit(0)       # success
+sys.exit(1)       # failure
+```
+
+::: aside
+With Typer you won’t use `sys.argv` directly, but you should understand it.
+:::
+
+---
+
+## `time`: measure how long profiling takes
+
+```python
+import time
+
+start = time.perf_counter_ns()
+# do work
+end = time.perf_counter_ns()
+
+elapsed_ms = (end - start) / 1_000_000
+print(f"Elapsed: {elapsed_ms:.2f}ms")
+```
+
+::: aside
+In an f-string, `:.2f` means “show 2 digits after the decimal point”.
+:::
+
+Why?
+
+- it’s easy feedback on performance
+- later, you’ll profile bigger datasets
+
+---
+
+## `shutil`: find tools + move files
+
+```python
+import shutil
+
+print(shutil.which("git"))
+print(shutil.which("python"))
+```
+
+Useful later:
+
+- check that `git` is installed before Day 5 tasks
+
+---
+
+## Mini-exercise: create your first module (8 minutes)
+
+Create `src/csv_profiler/strings.py`:
+
+```python
+def slugify(text: str) -> str:
+    """Turn 'Report Name' → 'report-name'."""
+    ...
+```
+
+Then import it in `main.py` (or another file):
+
+```python
+from csv_profiler.strings import slugify
+print(slugify("My Report 01"))
+```
+
+**Checkpoint:** prints `my-report-01`
+
+---
+
+## Solution — `slugify`
+
+```python
+def slugify(text: str) -> str:
+    cleaned = text.strip().casefold()
+    parts = cleaned.split()
+    return "-".join(parts)
+```
+
+::: aside
+This is intentionally simple.
+We can improve later (remove punctuation, etc.).
+:::
+
+---
+
+## Common import mistakes
+
+- Forgetting `__init__.py` in a package folder
+- Running from the wrong working directory
+- Importing by file path instead of module path
+- Naming your file `csv.py` or `json.py` (shadows built-ins!)
+
+::: callout-warning
+Never name your file the same as a standard library module.
+Example: don’t create `time.py`.
+:::
+
+---
+
+## Recap (Session 1)
+
+- A module is a `.py` file; a package is a folder of modules
+- Imports depend on `sys.path` → debug it!
+- Use `PYTHONPATH=src` (for now) to support `src/` layout
+- Core system modules: `os`, `sys`, `time`, `shutil`
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll switch from “scripts” to “objects”.
+
+# Session 2
+
+::: {.muted}
+OOP essentials (only what you need)
+:::
+
+---
+
+## Session 2 objectives
+
+- Know what a **class** is (and how to create an object)
+- Understand **encapsulation** (protect invariants)
+- Recognize **inheritance** (reuse behavior)
+- Explain **polymorphism** in Python (“duck typing”)
+- Apply OOP lightly to our profiler
+
+---
+
+## When should you use OOP? {.smaller}
+
+Use classes when you want:
+
+- **data + behavior** together
+- constraints/invariants (e.g., “age must be between 0–200”)
+- a reusable abstraction with a clear interface
+
+Don’t force OOP when:
+
+- a dict is enough
+- you have only one function using the data
+
+::: aside
+We use OOP as a tool — not as a goal.
+:::
+
+---
+
+## Vocabulary: class vs object (instance)
+
+- **Class**: a blueprint you write (`class Person: ...`)
+- **Object / instance**: a value you create (`p = Person(...)`)
+
+A class can contain:
+
+- **data** (attributes like `name`, `age`)
+- **behavior** (methods like `greet()`)
+
+---
+
+## A minimal class
+
+```python
+class Person:
+    def __init__(self, name: str, age: int) -> None:
+        self.name = name
+        self.age = age
+
+    def greet(self) -> str:
+        return f"Hi, I'm {self.name}"
+```
+
+Key idea:
+
+- `__init__` runs when you create the object
+- `self` is the object being created/used
+
+---
+
+## Using a class
+
+```python
+p = Person("Sara Ahmed", 23)
+
+print(p.name)        # attribute
+print(p.age)
+print(p.greet())     # method call
+```
+
+::: callout-tip
+A method is just a function that lives inside a class.
+It always receives `self` as the first parameter.
+:::
+
+---
+
+## Printing objects nicely with `__repr__` {.smaller}
+
+If you print an object without `__repr__`, you usually see something like:
+
+`<__main__.Person object at 0x...>`
+
+Add this:
+
+```python
+class Person:
+    ...
+    def __repr__(self) -> str:
+        return f"Person(name={self.name!r}, age={self.age})"
+```
+
+Now:
+
+```python
+print(p)  # Person(name='Sara Ahmed', age=23)
+```
+
+::: callout-tip
+To get the output of __repr__ as a `str` value for any object, you can use the builtin function `repr()`. In addition, you can also print the output in f-strings if you use the `!r` format specifier as in the example above. 
+:::
+
+::: aside
+The convention of `__repr__` is to show how the object was created. It should look like valid Python code.
+:::
+
+---
+
+## Read-only properties: computed attributes {.smaller}
+
+Sometimes you want an attribute that is **computed** from other data.
+
+```python
+class Person:
+    ...
+
+    @property
+    def first_name(self) -> str:
+        parts = self.name.split()
+        if not parts:
+            return ""
+        return parts[0]
+
+    @property
+    def last_name(self) -> str:
+        parts = self.name.split()
+        if not parts:
+            return ""
+        return parts[-1]
+```
+
+::: aside
+`@property` lets you write `p.first_name` instead of `p.first_name()`.
+:::
+
+---
+
+## Encapsulation: validate changes with a setter {.smaller}
+
+We want: “age must be between 0 and 200”.
+
+```python
+class Person:
+    def __init__(self, name: str, age: int) -> None:
+        self.name = name
+        self.age = age  # calls the setter
+
+    @property
+    def age(self) -> int:
+        return self._age
+
+    @age.setter
+    def age(self, value: int) -> None:
+        if value < 0 or value > 200:
+            raise ValueError("age must be between 0 and 200")
+        self._age = value
+```
+
+::: callout-tip
+We store the real value in `_age`. By convention, a leading `_` means "internal use".
+:::
+
+---
+
+## Mini-exercise: try the `Person` class (6 minutes)
+
+1) Create a person and print:
+
+```python
+p = Person("Sara Ahmed", 23)
+print(p)
+print(p.first_name)
+print(p.last_name)
+```
+
+2) Try an invalid update:
+
+```python
+p.age = 300
+```
+
+**Checkpoint:** you get a clear error (`ValueError`).
+
+---
+
+## Inheritance: reuse behavior
+
+```python
+class Employee(Person):
+    def __init__(self, name: str, age: int, salary: float) -> None:
+        super().__init__(name, age)
+        self.salary = salary
+
+class Student(Person):
+    def __init__(self, name: str, age: int, grades: list[float]) -> None:
+        super().__init__(name, age)
+        self.grades = grades
+
+    @property
+    def average(self) -> float:
+        if not self.grades:
+            return 0.0
+        return sum(self.grades) / len(self.grades)
+```
+
+::: aside
+`super().__init__(...)` calls the parent class constructor.
+:::
+
+---
+
+## Multiple inheritance (use carefully; optional)
+
+```python
+class WorkingStudent(Employee, Student):
+    def __init__(self, name, age, salary, grades):
+        self.name = name
+        self.age = age
+        self.salary = salary
+        self.grades = grades
+```
+
+Why careful?
+
+- the method resolution order (MRO) can be confusing
+- prefer composition (objects inside objects) for complex cases
+
+::: aside
+You can ignore multiple inheritance but you should know it exists.
+:::
+
+---
+
+## Polymorphism: “same method name, different types”
+
+```python
+values = ["abc", ["c", "b", "b"], ("a", "b", "a")]
+
+for value in values:
+    print(value.count("a"))
+```
+
+Key idea:
+
+- Python cares about **behavior** (“does it have `.count()`?”)
+- not the exact class name
+
+---
+
+## OOP in our project (two options)
+
+**Option A (fine):** keep using dicts
+
+```python
+{"name": "age", "type": "number", "missing": 2, "mean": 24.3}
+```
+
+**Option B (cleaner):** use a small class
+
+```python
+ColumnProfile(name="age", inferred_type="number", missing=2, ...)
+```
+
+Today: we’ll implement one small class to practice.
+
+---
+
+## Mini-exercise: build `ColumnProfile` (10 minutes) {.smaller}
+
+Create `src/csv_profiler/models.py`:
+
+```python
+class ColumnProfile:
+    def __init__(self, name: str, inferred_type: str, total: int, missing: int, unique: int):
+        ...
+
+    @property
+    def missing_pct(self) -> float:
+        ...
+
+    def to_dict(self) -> dict[str, str | int | float]:
+        ...
+```
+
+**Checkpoint:** `missing_pct` returns a number between `0` and `100`.
+
+---
+
+## Solution — `ColumnProfile` {.smaller}
+
+```python {code-line-numbers="1-7|8-10|11-19|20-24|"}
+class ColumnProfile:
+    def __init__(self, name: str, inferred_type: str, total: int, missing: int, unique: int):
+        self.name = name
+        self.inferred_type = inferred_type
+        self.total = total
+        self.missing = missing
+        self.unique = unique
+    @property
+    def missing_pct(self) -> float:
+        return 0.0 if self.total == 0 else 100.0 * self.missing / self.total
+    def to_dict(self) -> dict[str, str | int | float]:
+        return {
+            "name": self.name,
+            "type": self.inferred_type,
+            "total": self.total,
+            "missing": self.missing,
+            "missing_pct": self.missing_pct,
+            "unique": self.unique,
+        }
+    def __repr__(self) -> str:
+        return (
+            f"ColumnProfile(name={self.name!r}, type={self.inferred_type!r}, "
+            f"missing={self.missing}, total={self.total}, unique={self.unique})"
+        )
+```
+
+---
+
+## How to use this in profiling code
+
+Instead of building a dict per column:
+
+```python
+col = ColumnProfile(
+    name=col_name,
+    inferred_type=col_type,
+    total=n_rows,
+    missing=missing,
+    unique=unique,
+)
+```
+
+When exporting JSON:
+
+```python
+columns = []
+for c in column_profiles:
+    columns.append(c.to_dict())
+```
+
+---
+
+## Recap (Session 2)
+
+- A class groups **data + behavior** (encapsulation)
+- Properties can **compute** values (`first_name`) or **validate** updates (`age`)
+- Inheritance reuses behavior; polymorphism is “same interface, different types”
+- A small model class can make your report easier to reason about
+
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we build a CLI that graders can run.
+
+# Session 3
+
+::: {.muted}
+Typer CLI from type hints
+:::
+
+---
+
+## Session 3 objectives
+
+- Install and run Typer
+- Understand commands, arguments, and options
+- Build `profile` command for your project
+- Handle errors and exit codes nicely
+
+---
+
+## Why a CLI?
+
+A CLI makes your project:
+
+- **reproducible** (same command, same output)
+- **gradeable** (instructor can run it)
+- **automatable** (later: CI / workflows)
+
+::: aside
+Streamlit is for humans.
+CLI is for humans *and* machines.
+:::
+
+---
+
+## Install Typer
+
+Inside your project environment:
+
+```bash
+uv pip install typer
+```
+
+Quick check:
+
+```bash
+uv run python -c "import typer; print(typer.__version__)"
+```
+
+---
+
+## A tiny detour: type hints (just labels)
+
+- `name: str` is a **type hint** (also called an annotation).
+- Python does **not** magically enforce it at runtime.
+- Tools can use it (and **Typer** uses it to convert CLI text into the right type).
+
+Example:
+
+```python
+def add_one(x: int):
+    return x + 1
+```
+
+Today we’ll mostly use: `str`, `int`, `float`, and `Path`.
+
+---
+
+## A tiny detour: what does `@something` mean?
+
+- A line starting with `@` is a **decorator**.
+- It *wraps* a function or registers it somewhere.
+
+Two decorators you'll see today:
+
+- `@property` (makes a method act like an attribute)
+- `@app.command()` (registers a function as a CLI command)
+
+::: aside
+You don't need to write your own decorators today — just use them.
+:::
+
+---
+
+## A minimal Typer app
+
+```python
+import typer
+
+app = typer.Typer()
+
+@app.command()
+def hello(name: str) -> None:
+    print(f"Hello, {name}!")
+
+@app.command()
+def goodbye(name: str, formal: bool = False) -> None:
+    print(("Goodbye" if formal else "Bye") + f", {name}!")
+
+if __name__ == "__main__":
+    app()
+```
+
+Run:
+
+```bash
+uv run python main.py --help
+uv run python main.py hello Sara
+```
+
+---
+
+## Commands vs arguments vs options
+
+- **Command**: a verb (`profile`, `validate`, `version`)
+- **Argument**: required positional input
+  - `profile data/sample.csv`
+- **Option**: named + optional
+  - `--out-dir outputs`
+
+::: callout-tip
+In Typer, Python type hints become CLI parsing.
+:::
+
+---
+
+## Quick refresher: `Path` objects for file paths {.smaller}
+
+Instead of passing file paths as plain strings, we often use `Path` objects.
+
+```python
+from pathlib import Path
+
+p = Path("data") / "sample.csv"   # `/` joins paths safely (Windows/macOS/Linux)
+print(p.exists())
+
+out_dir = Path("outputs")
+out_dir.mkdir(exist_ok=True)
+
+(out_dir / "hello.txt").write_text("hi", encoding="utf-8")
+```
+
+Why use `Path`?
+
+- fewer bugs with slashes (`\` vs `/`)
+- nice helpers like `.exists()`, `.mkdir()`, `.read_text()`, `.write_text()`
+
+---
+
+## Use `pathlib.Path` for file paths
+
+```python
+from pathlib import Path
+import typer
+
+@app.command()
+def profile(input_path: Path, out_dir: Path = Path("outputs")):
+    ...
+```
+
+Inside the function:
+
+```python
+if not input_path.exists():
+    raise typer.BadParameter("Input file does not exist")
+```
+
+---
+
+## Add helpful `--help` descriptions {.smaller}
+
+```python
+@app.command(help="Profile a CSV file and write JSON + Markdown reports")
+def profile(
+    input_path: Path = typer.Argument(..., help="Path to input CSV"),
+    out_dir: Path = typer.Option(Path("outputs"), "--out-dir", help="Output folder"),
+):
+    ...
+```
+
+---
+
+## Error handling pattern (CLI-friendly)
+
+```python
+@app.command()
+def profile(input_path: Path):
+    try:
+        # work
+        ...
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+```
+
+Why?
+
+- user sees a clear message
+- your program returns a failure code
+
+---
+
+## Mini-quiz
+
+What should your CLI do if the input file doesn’t exist?
+
+A) silently create it
+B) crash with a long stack trace
+C) print a clear message and exit with non-zero code
+
+. . .
+
+**Preferred:** C
+
+---
+
+## Add multiple commands (optional today)
+
+```python
+@app.command()
+def version():
+    """Print version info."""
+    print("csv-profiler 0.1")
+
+@app.command()
+def profile(...):
+    ...
+```
+
+Run:
+
+```bash
+... version
+... profile data/sample.csv
+```
+
+---
+
+## Mini-exercise: sketch your `profile` command (10 minutes)
+
+Create `src/csv_profiler/cli.py` with:
+
+- `app = typer.Typer()`
+- `profile` command:
+  - argument: `input_path`
+  - option: `--out-dir`
+  - option: `--report-name` (default `report`)
+
+**Checkpoint:** `--help` shows your options.
+
+---
+
+## Solution — CLI skeleton {.smaller}
+
+```python
+from pathlib import Path
+import typer
+
+app = typer.Typer()
+
+@app.command(help="Profile a CSV file and write JSON + Markdown")
+def profile(
+    input_path: Path = typer.Argument(..., help="Input CSV file"),
+    out_dir: Path = typer.Option(Path("outputs"), "--out-dir", help="Output folder"),
+    report_name: str = typer.Option("report", "--report-name", help="Base name for outputs"),
+):
+    # implementation comes in hands-on
+    typer.echo(f"Input: {input_path}")
+    typer.echo(f"Out:   {out_dir}")
+    typer.echo(f"Name:  {report_name}")
+
+if __name__ == "__main__":
+    app()
+```
+
+---
+
+## Run the CLI (with `-m`)
+
+From your project root:
+
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli --help
+```
+
+Try:
+
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv
+```
+
+---
+
+## Recap (Session 3)
+
+- Typer turns type hints into a CLI
+- Good CLIs have:
+  - helpful `--help`
+  - clear error messages
+  - non-zero exit codes on failure
+- Next: wire your CLI to your profiler library
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** hands-on build time.
+
+# Hands-on
+
+::: {.muted}
+CSV Profiler — Part 3 (Package + CLI)
+:::
+
+---
+
+## CSV Profiler — Part 3 (Package + CLI)
+
+**Goal:** Run one command that generates:
+
+- `outputs/<name>.json`
+- `outputs/<name>.md`
+
+**You need:**
+
+- your Day 2 profiler code
+- Typer installed
+
+**Deliverable:** CLI works on `data/sample.csv`.
+
+::: {.notes}
+**Say:** “We will do this in small tasks. Don’t jump ahead. Finish each checkpoint.”
+
+**Do:** Live-code Task 1 quickly, then let students repeat.
+
+**Timebox:** 2 hours total.
+:::
+
+---
+
+## Hands-on checklist
+
+By the end, you can run:
+
+```bash
+PYTHONPATH=src \
+    uv run python -m csv_profiler.cli \
+    profile data/sample.csv \
+    --out-dir outputs \
+    --report-name report
+```
+
+And you get:
+
+- `outputs/report.json`
+- `outputs/report.md`
+
+---
+
+## Task 1 — Create the package skeleton (10 minutes) {.smaller}
+
+1. Create folders:
+
+```bash
+mkdir -p src/csv_profiler
+```
+
+2. Create empty init:
+
+```bash
+touch src/csv_profiler/__init__.py
+```
+
+3. Create empty modules:
+
+    - `io.py`
+    - `profiling.py`
+    - `render.py`
+    - `cli.py`
+
+**Checkpoint:** the folder tree matches the target structure.
+
+---
+
+## Solution — expected tree
+
+```text
+src/
+└── csv_profiler/
+    ├── __init__.py
+    ├── io.py
+    ├── profiling.py
+    ├── render.py
+    └── cli.py
+```
+
+::: callout-tip
+Windows users: if you don’t have `touch`, create files from VS Code.
+:::
+
+---
+
+## CSV reminder: `csv.DictReader` (2 minutes)
+
+- `csv.DictReader` reads a CSV file and gives you **one dictionary per row**.
+- The dictionary keys come from the **header row**.
+
+Example (prints the first row dict):
+
+```python
+import csv
+from pathlib import Path
+
+path = Path("data/sample.csv")
+with path.open("r", encoding="utf-8") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row)  # e.g. {'age': '23', 'name': 'Sara'}
+        break
+```
+
+---
+
+## Task 2 — Move CSV reading into `io.py` (15 minutes) {.smaller}
+
+Create `src/csv_profiler/io.py`:
+
+- function: `read_csv_rows(path: Path) -> list[dict[str, str]]`
+- returns: a list of row dictionaries
+- use `csv.DictReader`
+- raise a clear error if:
+  - file not found
+  - CSV has no rows
+
+**Checkpoint:** you can import and call it from a scratch script.
+
+---
+
+## Solution — `read_csv_rows`
+
+```python
+import csv
+from pathlib import Path
+
+
+def read_csv_rows(path: Path) -> list[dict[str, str]]:
+    """Read a CSV file and return a list of row dictionaries."""
+    if not path.exists():
+        raise FileNotFoundError(f"CSV not found: {path}")
+
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    if not rows:
+        raise ValueError("CSV has no data rows")
+    return rows
+```
+
+---
+
+## Task 3 — Move profiling logic into `profiling.py` (25 minutes) {.smaller}
+
+In `src/csv_profiler/profiling.py`:
+
+- move helpers: `is_missing`, `try_float`, `infer_type`
+- create: `profile_rows(rows: list[dict[str, str]]) -> dict`
+- returns: a report dictionary (JSON-serializable)
+
+Report keys (minimum):
+
+- `n_rows`
+- `n_cols`
+- `columns` (list)
+
+**Checkpoint:** `profile_rows(rows)` returns a JSON-serializable dict.
+
+---
+
+## Solution — profiling skeleton {.smaller}
+
+```python
+def is_missing(value: str | None) -> bool:
+    if value is None:
+        return True
+
+    cleaned = value.strip().casefold()
+    return cleaned in {"", "na", "n/a", "null", "none", "nan"}
+
+def try_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+def infer_type(values: list[str]) -> str:
+    usable = [v for v in values if not is_missing(v)]
+    if not usable:
+        return "text"
+
+    for v in usable:
+        if try_float(v) is None:
+            return "text"
+
+    return "number"
+```
+
+---
+
+## Tiny tool: `set()` for unique values
+
+A `set` keeps only **unique** items (duplicates are removed).
+
+```python
+values = ["a", "b", "a"]
+unique_values = set(values)
+
+print(unique_values)       # {'a', 'b'} (order doesn't matter)
+print(len(unique_values))  # 2
+```
+
+We’ll use `len(set(...))` to count unique **non-missing** values in a column.
+
+---
+
+## Solution — `profile_rows` (baseline) {.smaller}
+
+```python {code-line-numbers="1-2|4-6|7-9|10-16|17-21|3-4,22|1,23|"}
+def profile_rows(rows: list[dict[str, str]]) -> dict:
+    n_rows, columns = len(rows), list(rows[0].keys())
+    col_profiles = []
+    for col in columns:
+        values = [r.get(col, "") for r in rows]
+        usable = [v for v in values if not is_missing(v)]
+        missing = len(values) - len(usable)
+        inferred = infer_type(values)
+        unique = len(set(usable))
+        profile = {
+            "name": col,
+            "type": inferred,
+            "missing": missing,
+            "missing_pct": 100.0 * missing / n_rows if n_rows else 0.0,
+            "unique": unique,
+        }
+        if inferred == "number":
+            nums = [try_float(v) for v in usable]
+            nums = [x for x in nums if x is not None]
+            if nums:
+                profile.update({"min": min(nums), "max": max(nums), "mean": sum(nums) / len(nums)})
+        col_profiles.append(profile)
+    return {"n_rows": n_rows, "n_cols": len(columns), "columns": col_profiles}
+```
+
+::: aside
+You can later swap dicts for `ColumnProfile` objects.
+:::
+
+---
+
+## Task 4 — Render Markdown in `render.py` (20 minutes)
+
+Create `src/csv_profiler/render.py`:
+
+- function: `render_markdown(report: dict) -> str`
+- include:
+  - title
+  - dataset summary
+  - a table of columns
+
+**Checkpoint:** `render_markdown(report)` returns a multi-line Markdown string.
+
+---
+
+## Solution — `render_markdown` (simple) {.smaller}
+
+```python
+from datetime import datetime
+
+def render_markdown(report: dict) -> str:
+    lines: list[str] = []
+
+    lines.append(f"# CSV Profiling Report\n")
+    lines.append(f"Generated: {datetime.now().isoformat(timespec='seconds')}\n")
+
+    lines.append("## Summary\n")
+    lines.append(f"- Rows: **{report['n_rows']}**")
+    lines.append(f"- Columns: **{report['n_cols']}**\n")
+
+    lines.append("## Columns\n")
+    lines.append("| name | type | missing | missing_pct | unique |")
+    lines.append("|---|---:|---:|---:|---:|")
+    lines.extend([
+        f"| {c['name']} | {c['type']} | {c['missing']} | {c['missing_pct']:.1f}% | {c['unique']} |"
+        for c in report["columns"]
+    ])
+
+    lines.append("\n## Notes\n")
+    lines.append("- Missing values are: `''`, `na`, `n/a`, `null`, `none`, `nan` (case-insensitive)")
+
+    return "\n".join(lines)
+```
+
+---
+
+## Task 5 — Wire everything in `cli.py` (30 minutes) {.smaller}
+
+In `src/csv_profiler/cli.py`:
+
+- implement `profile` command
+- call:
+  - `read_csv_rows()`
+  - `profile_rows()`
+  - `render_markdown()`
+- write outputs to `out_dir`:
+  - `<report_name>.json`
+  - `<report_name>.md`
+
+**Checkpoint:** running the command creates both files.
+
+---
+
+## Solution — `cli.py` (working version) {.smaller auto-animate="true"}
+
+```python {code-line-numbers="1-8|10,12-13,18,21-22|14|15|16|17|19|"}
+import json
+import time
+import typer
+from pathlib import Path
+
+from csv_profiler.io import read_csv_rows
+from csv_profiler.profiling import profile_rows
+from csv_profiler.render import render_markdown
+
+app = typer.Typer()
+
+@app.command(help="Profile a CSV file and write JSON + Markdown")
+def profile(
+    input_path: Path = typer.Argument(..., help="Input CSV file"),
+    out_dir: Path = typer.Option(Path("outputs"), "--out-dir", help="Output folder"),
+    report_name: str = typer.Option("report", "--report-name", help="Base name for outputs"),
+    preview: bool = typer.Option(False, "--preview", help="Print a short summary"),
+):
+    ...  # (see next slide for this implementation)
+
+if __name__ == "__main__":
+    app()
+```
+
+::: aside
+The actual implementation of this function is in the next slide.
+:::
+
+---
+
+## Solution — `cli.py` (working version) {.smaller auto-animate="true"}
+```python {code-line-numbers="1,21-23|3-4|2,5-6|8|10-12|14-16|18-19|"}
+try:
+    t0 = time.perf_counter_ns()
+    rows = read_csv_rows(input_path)
+    report = profile_rows(rows)
+    t1 = time.perf_counter_ns()
+    report["timing_ms"] = (t1 - t0) / 1_000_000
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    json_path = out_dir / f"{report_name}.json"
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    typer.secho(f"Wrote {json_path}", fg=typer.colors.GREEN)
+
+    md_path = out_dir / f"{report_name}.md"
+    md_path.write_text(render_markdown(report), encoding="utf-8")
+    typer.secho(f"Wrote {md_path}", fg=typer.colors.GREEN)
+
+    if preview:
+        typer.echo(f"Rows: {report['n_rows']} | Cols: {report['n_cols']} | {report['timing_ms']:.2f}ms")
+
+except Exception as e:
+    typer.secho(f"Error: {e}", fg=typer.colors.RED)
+    raise typer.Exit(code=1)
+```
+
+::: aside
+This is the implementation of `profile()`.
+:::
+
+---
+
+## Task 6 — Run + verify (10 minutes) {.smaller}
+
+Run:
+
+```bash
+PYTHONPATH=src uv run \
+    python -m csv_profiler.cli \
+    profile data/sample.csv --preview
+```
+
+Then open:
+
+- `outputs/report.json`
+- `outputs/report.md`
+
+**Checkpoint:** `timing_ms` exists in JSON and Markdown table lists all columns
+
+::: callout-tip
+The backslash `\` at the end of each line means that the command didn't end here and it will continue on the next line. The above command is the same as the following:
+```bash
+PYTHONPATH=src uv run python -m csv_profiler.cli profile data/sample.csv --preview
+```
+:::
+
+---
+
+## Troubleshooting: common issues
+
+If you see `ModuleNotFoundError: csv_profiler`:
+
+- make sure you are in the project root
+- ensure `PYTHONPATH=src`
+- ensure `src/csv_profiler/__init__.py` exists
+
+If you see encoding errors:
+
+- try `encoding="utf-8-sig"` for reading
+- or confirm the CSV is UTF-8
+
+---
+
+## Stretch tasks (if you finish early)
+
+1. Add `--out-dir` default to a *new folder per run*:
+   - `outputs/2025-12-16_1930/`
+2. Add a `--fail-on-missing-pct 30` option:
+   - exit with code 2 if any column exceeds threshold
+3. Add `version` command
+
+---
+
+## Recap (Hands-on)
+
+You now have:
+
+- a real Python package layout
+- a CLI that reads CSV and writes JSON + Markdown
+- timing + better error handling
+
+Tomorrow: Streamlit GUI will reuse the same library.
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**What caused your biggest slowdown today: imports, refactoring, or CLI wiring?**
+
+---
+
+## What to do after class (Day 3 assignment)
+
+**Due:** before Day 4 starts (Wed, 17 Dec 2025)
+
+1. Make `--help` look professional:
+   - clear descriptions
+   - sensible defaults
+2. Add one more CLI option:
+   - `--delimiter` (even if you keep `,` as default)
+3. Add one more section to Markdown:
+   - show the slowest/fastest column to process (your choice)
+
+**Deliverable:** updated project folder with working CLI.
+
+::: callout-tip
+Keep your changes small and commit-worthy.
+Even before Day 5, practicing commits helps.
+:::
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

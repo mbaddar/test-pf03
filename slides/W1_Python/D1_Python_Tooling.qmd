@@ -1,0 +1,1620 @@
+---
+pagetitle: "W1 D1"
+title: "Python & Tooling"
+subtitle: "AI Professionals Bootcamp | Week 1"
+date: 2025-12-14
+---
+
+## Policy: GenAI usage
+
+- ✅ Allowed: **clarifying questions** (definitions, error explanations)
+- ❌ Not allowed: generating code, writing solutions, or debugging by copy-paste
+- If unsure: ask the instructor first
+
+::: callout-warning
+The point is skill-building. Using GenAI to do the work breaks the learning loop.
+:::
+
+---
+
+## Bootcamp Certificates
+
+- **Certificate of Completion:** final grade **≥ 70%** by end of the bootcamp
+- **Certificate of Attendance:** if not passing, but **fewer than 4 excused absences**
+
+---
+
+## How we’ll work in class
+
+- Short chunks of theory
+- Micro-exercises (3–8 minutes)
+- Checkpoints every ~15 minutes
+- “Hands-on” block = build the project (with help)
+
+::: callout-tip
+If you get stuck: write down the **exact error**, the **command you ran**, and the **file you edited**.
+:::
+
+---
+
+## Bootcamp calendar
+
+- **Week 1: Python & Tooling**
+- Week 2: Data Work (ETL + EDA)
+- Week 3: Machine Learning
+- Week 4: Deep Learning & Computer Vision
+- Week 5: LLM-based NLP
+- Week 6: Building AI Apps
+- Week 7: Agentic AI & Practical MLOps
+- Week 8: Capstone Sprint + Job Readiness
+
+# Day 1: Python & Tooling
+
+**Goal:** Set up your environment, use the shell confidently, and write your first Python scripts that read a CSV and produce a basic profile.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** This week is “no GenAI” (except clarifying questions). We’re building fundamentals.
+
+**Do:** Confirm everyone can open a terminal + VS Code.
+
+**Ask:** “What’s harder for you right now: terminal, Python syntax, or Git?”
+
+**Timebox:** 3 minutes.
+:::
+
+---
+
+## Today’s Flow
+
+- **Session 1 (60m):** Setup + Shell essentials + `uv`
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Values, containers, operators
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Control flow + types + files
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** weekly project start (CSV Profiler)
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+- Navigate and inspect files using basic shell commands
+- Create and use a Python environment with `uv`
+- Write Python scripts with variables, basic types, and control flow
+- Read a CSV and compute a **basic profiling summary**
+- Write outputs to **Markdown** and **JSON** files
+
+---
+
+## Week 1 outcomes (ship by Thu 11:59pm) {.smaller}
+
+You will build a small app called “CSV Profiler” with **two interfaces**:
+
+- **CLI** (command line) → reads CSV → writes `report.md` and `report.json`
+- **GUI** with **Streamlit** → uploads/reads CSV → shows profile → export files
+
+**Input:** a CSV file
+
+**Output:**
+
+- `report.json` → machine-readable profiling stats
+- `report.md` → human-readable report
+
+**Your code** will handle:
+
+- Missing values & Inferred column types (number / text / mixed)
+- Basic stats (count, unique, min/max/mean when numeric)
+
+::: aside
+This week is fundamentals: you’ll implement the profiling logic yourself.
+:::
+
+# Session 1
+
+::: {.muted}
+Setup + Shell essentials + `uv`
+:::
+
+---
+
+## Session 1 objectives
+
+- Open a terminal and move around the filesystem
+- Understand paths: absolute vs relative
+- Find your Python and inspect environment variables
+- Create a Python env and run a script with `uv`
+
+---
+
+## Terminal vocabulary
+
+- **Terminal**: the window
+- **Shell**: the program that reads your commands (bash, zsh, PowerShell)
+- **Command**: a program you run (`ls`, `python`, `git`)
+- **Working directory**: “where you are” right now
+
+---
+
+## IDEs you can use (pick one)
+
+- **VS Code** (recommended for this bootcamp)
+- **JupyterLab** (great for exploration)
+- **Google Colab** (only when local setup is blocked)
+
+::: aside
+Today we’ll work mostly with scripts in VS Code.
+:::
+
+---
+
+## Navigation: where am I?
+
+:::: {.columns}
+::: {.column width="50%"}
+**Command**
+
+- `pwd` → print working directory
+- `ls` (mac/linux) or `dir` (Windows) → list files
+:::
+
+::: {.column width="50%"}
+**Try it**
+
+1. Run `pwd`
+2. Run `ls` / `dir`
+3. Find your “Downloads” or “Desktop” folder
+:::
+::::
+
+::: {.notes}
+**Do:** Live demo: `pwd` then `ls`, explain “working directory”.
+
+**Ask:** “What folder are you in right now?”
+
+**Timebox:** 4 minutes.
+:::
+
+---
+
+## Navigation: moving around
+
+- `cd <path>` → change directory
+- `cd ..` → go up one folder
+- `cd .` → current folder (rarely useful)
+- `cd ~` → home folder
+- `cd -` → previous folder (super useful)
+
+---
+
+## Creating folders and files (quick essentials) {.smaller}
+
+You’ll use these today to set up your project.
+
+**macOS/Linux**
+```bash
+mkdir my_folder  # creates a folder
+mkdir -p a/b/c  # creates nested folders
+touch notes.txt  # creates empty file
+
+```
+
+**Windows PowerShell**
+
+```powershell
+mkdir my_folder
+ni notes.txt     # New-Item (creates empty file)
+
+```
+
+::: aside
+If you prefer, you can also create folders using the file explorer — just keep track of the paths.
+:::
+
+---
+
+## Paths: absolute vs relative
+
+**Absolute path** starts from the root.
+
+- mac/linux: `/Users/<name>/...`
+- Windows: `C:\Users\<name>\...`
+
+**Relative path** starts from your current folder.
+
+- `./data/sample.csv` (inside current folder)
+- `../data/sample.csv` (one level up)
+
+---
+
+## Path gotchas (avoid 20 minutes of pain)
+
+- Spaces in folder names can confuse commands → use quotes
+  - `cd "My Files"`
+- Case matters on mac/linux (`Data` ≠ `data`)
+- Prefer putting your project in a simple path like `~/bootcamp/`
+
+---
+
+## Micro-exercise: “Path ninja” (5 minutes)
+
+1. `cd ~`
+2. Create a new folder called `bootcamp` *(use your file explorer if needed)*
+3. `cd bootcamp`
+4. Confirm with `pwd` and `ls` / `dir`
+
+**Checkpoint:** your terminal shows you are inside `bootcamp`.
+
+---
+
+## Environment variables (why you care)
+
+- They are **settings** for programs
+- Most common: `PATH` (where your shell looks for commands)
+
+Try:
+
+- `echo $PATH` (mac/linux)
+- `echo $env:PATH` (PowerShell)
+
+---
+
+## Finding executables
+
+- `which python` (mac/linux)
+- `where python` (Windows)
+
+**Interpretation:**
+
+- If you see a path inside `.venv/` → you are in a virtual environment
+- If you see a system path → you are using system Python
+
+---
+
+## Why virtual environments?
+
+Different projects need different packages.
+
+- ✅ reproducible installs
+- ✅ no “works on my machine”
+- ✅ you can safely delete and recreate
+
+---
+
+## `uv`: our tool for environments + installs
+
+Today we’ll use:
+
+```bash
+uv venv -p 3.11
+uv pip install <package>
+uv run <script.py>
+```
+
+---
+
+## Activate vs `uv run`
+
+- If you **activate**, `python` and `pip` point to the env
+- If you **don’t activate**, `uv run ...` still uses the env
+
+**Recommended habit:** use `uv run` for anything you want to be reproducible
+
+::: aside
+You can activate the env, but `uv run` works even if you forget.
+:::
+
+---
+
+## Create a new env (demo + do)
+
+From inside `bootcamp/`:
+
+```bash
+uv venv -p 3.11
+```
+
+Expected result: a folder named `.venv/`
+
+---
+
+## “Activate” vs “don’t activate”
+
+- If you **activate**, `python` points to `.venv` automatically
+- If you **don’t**, use `uv run ...` to guarantee the env
+
+::: callout-tip
+If you ever wonder “which python am I using?”, run `which python` / `where python`.
+:::
+
+---
+
+## Activate (optional but useful)
+
+mac/linux:
+
+```bash
+. .venv/bin/activate
+```
+
+Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+**Check:** your prompt usually changes.
+
+---
+
+## Python packages (libraries): what are we installing?
+
+- **Standard library**: ships with Python (e.g., `csv`, `json`)
+- **Third-party packages**: extra features you install (e.g., `typer`, `streamlit`)
+
+`uv pip install ...` downloads third-party packages into your project’s env so you can import them later.
+
+---
+
+## Install a package (we’ll use later)
+
+```bash
+uv pip install typer streamlit
+```
+
+::: callout-tip
+If installation fails: copy the full error + your OS info and ask the instructor.
+:::
+
+---
+
+## Run a Python script with `uv run`
+
+Create `hello.py`:
+
+```python
+print("Hello from Week 1!")
+```
+
+Run:
+
+```bash
+uv run hello.py
+```
+
+---
+
+## Quick Check
+
+What is the main difference?
+
+- A) `uv run hello.py`
+- B) `python hello.py`
+
+. . .
+
+**Answer:** `uv run` ensures the command runs inside the project environment.
+
+---
+
+## Mini-lab: “Run + break + fix” (7 minutes)
+
+1. Change `hello.py` to print your name
+2. Introduce a syntax error (missing quote)
+3. Run it and read the error
+4. Fix it
+
+**Checkpoint:** you can explain what line the error points to.
+
+---
+
+## Session 1 recap
+
+- Terminal basics: `pwd`, `ls/dir`, `cd`
+- Paths and environment variables
+- `uv venv` + `uv run`
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** open VS Code in your `bootcamp/` folder.
+
+# Session 2
+
+::: {.muted}
+Python values, containers, operators
+:::
+
+---
+
+## Session 2 objectives
+
+- Recognize Python’s core value types
+- Use lists/tuples/sets/dicts
+- Use arithmetic, comparison, and logical operators
+- Predict the output of short expressions
+
+---
+
+## A Python program is just values + steps
+
+1. Create values (numbers, text, containers)
+2. Combine them (operators)
+3. Make decisions (if / loops)
+4. Organize into functions and files
+
+---
+
+## Literals: quick tour
+
+- `None`, `True`, `False`
+- Integers: `0`, `-2`, `1_000_000`, `0x1f`
+- Floats: `1.5`, `1e6`, `-2.5e-3`
+- Strings: `'hi'`, `"hi"`, `"""multi"""`
+
+::: aside
+Underscores in numbers are allowed: `1_000_000`.
+:::
+
+---
+
+## Containers (you’ll use these all week)
+
+| Type | Example | Mutable? | Typical use |
+|---|---|---|---|
+| `list` | `[1, 2, 3]` | ✅ | ordered items |
+| `tuple` | `(1, 2)` | ❌ | fixed group |
+| `set` | `{1, 2}` | ✅ | unique items |
+| `dict` | `{ "a": 1 }` | ✅ | key → value |
+
+---
+
+## Dot notation: methods (quick idea)
+
+You’ll often see `something.do_this(...)`.
+
+- `do_this` is a **method**: a function that belongs to that value
+- The parentheses `(...)` mean “call the function”
+
+Example:
+
+```python
+names = ["Aisha", "Noor"]
+names.append("Salem")  # add an item to the list
+```
+
+---
+
+## Tuples vs lists (when to use which?)
+
+:::: {.columns}
+::: {.column width="50%"}
+**Tuple** (immutable)
+
+```python
+point = (3, 5)
+```
+
+- Fixed structure
+- Safe to pass around
+:::
+
+::: {.column width="50%"}
+**List** (mutable)
+
+```python
+names = ["Aisha", "Noor"]
+names.append("Salem")
+```
+
+- Grows/shrinks
+- Good for accumulation
+:::
+::::
+
+---
+
+## Tuples vs lists (quick intuition)
+
+- Use a **list** when you plan to change it
+- Use a **tuple** for a fixed “record” (like coordinates)
+
+```python
+point = (24.7136, 46.6753)  # (lat, lon)
+names = ["Aisha", "Fahad"]
+names.append("Noor")
+```
+
+---
+
+## Sets: uniqueness tool
+
+```python
+items = ["a", "b", "b", "c"]
+unique = set(items)
+print(unique)  # {'a','b','c'} (order not guaranteed)
+```
+
+Use cases:
+
+- remove duplicates
+- fast membership checks (`x in my_set`)
+
+---
+
+## Variables are labels, not boxes
+
+```python
+x = [1, 2, 3]
+y = x
+y.append(4)
+print(x)  # ?
+```
+
+. . .
+
+`x` becomes `[1, 2, 3, 4]` because `x` and `y` point to the same list.
+
+---
+
+## Operators: your everyday toolkit
+
+- Arithmetic: `+ - * / // % **`
+- Comparison: `< <= == != >= >`
+- Logical: `and or not`
+- Membership: `in`, `not in`
+- Identity: `is`, `is not` *(usually with `None`)*
+
+---
+
+## `in` vs `==` vs `is`
+
+- `x in container` → membership (lists/strings/sets/dicts)
+- `x == y` → value equality
+- `x is y` → same object in memory *(use for `None`)*
+
+```python
+x = None
+if x is None:
+    print("missing")
+```
+
+---
+
+## Operator precedence (don’t guess)
+
+Rule of thumb:
+
+1. Parentheses `(...)`
+2. Power `**`
+3. Multiply/divide `* / // %`
+4. Add/subtract `+ -`
+5. Comparisons `== < > ...`
+6. `not` → `and` → `or`
+
+When in doubt: add parentheses.
+
+---
+
+## Operator precedence (mental model)
+
+1. Parentheses `(...)`
+2. Exponents `**`
+3. Multiply/divide `* / // %`
+4. Add/subtract `+ -`
+5. Comparisons `< == >`
+6. Logical `not`, `and`, `or`
+
+When in doubt: add parentheses.
+
+---
+
+## Quick Check: predict the result
+
+What do these evaluate to?
+
+1. `5 // 2`
+2. `5 / 2`
+3. `5 % 2`
+4. `2 ** 3`
+
+. . .
+
+Answers: `2`, `2.5`, `1`, `8`
+
+---
+
+## Truthiness (important for data work)
+
+These are **False**:
+
+- `None`, `0`, `0.0`, `""`, `[]`, `{}`, `set()`
+
+Most other things are **True**.
+
+---
+
+## Casting: turning text into numbers
+
+```python
+int("32")
+float("-2.5e-3")
+list("abc")  # turn an iterable into a list
+bool("False")  # careful!
+```
+
+::: callout-warning
+`bool("False")` is **True** because it’s a non-empty string.
+:::
+
+---
+
+## Mini-quiz (pairs): casting
+
+Decide **without running**:
+
+1. `bool([])`
+2. `bool([0])`
+3. `int(1.9)`
+4. `float(3)`
+
+. . .
+
+Answers: `False`, `True`, `1`, `3.0`
+
+---
+
+## Lists: indexing and slicing
+
+```python
+x = [4, 5, 6, 7, 8, 9]
+print(x[1])     # 5
+print(x[-2])    # 8
+print(x[1:3])   # [5, 6]
+print(x[::-1])  # reversed
+```
+
+
+---
+
+## Dicts: the “data row” type
+
+```python
+row = {"name": "Aisha", "age": 23}
+print(row["name"])
+row["age"] += 1
+```
+
+Why we care:
+
+- `csv.DictReader` gives you dicts (column → value)
+
+---
+
+## Dicts: keys, membership, and safe access
+
+You’ll often need the **column names** and to check if a key exists.
+
+```python
+row = {"name": "Aisha", "age": "23"}
+
+print(row.keys())           # dict_keys(['name', 'age'])
+print("age" in row)        # True
+print(row["age"])          # '23'
+
+# If a key might be missing, use .get with a default:
+print(row.get("salary", ""))
+```
+
+::: aside
+For CSV data, keys usually exist for every column, but values may be empty strings.
+:::
+
+---
+
+## Printing values (and why it matters)
+
+When you build reports, you’ll print and write lots of text.
+
+Three common ways:
+
+```python
+city = "Riyadh"
+temp = 19.5
+
+print("City:", city, "Temp:", temp)     # simplest
+print("City: " + city)                   # string concatenation
+```
+
+---
+
+## f-strings: readable formatting (intro)
+
+f-strings let you put values **inside** a string:
+
+```python
+city = "Riyadh"
+temp = 19.5
+is_weekend = True
+
+print(f"In {city}, temp is {temp}C. Weekend? {is_weekend}")
+```
+
+We’ll use this style a lot in reports.
+
+---
+
+## Micro-exercise: build a tiny “row” (6 minutes)
+
+Create a dictionary with:
+
+- `"city"`
+- `"temp_c"`
+- `"is_weekend"`
+
+Then print a sentence using an **f-string**.
+
+**Checkpoint:** Your output includes all three values.
+
+---
+
+## Solution (example)
+
+```python
+r = {"city": "Riyadh", "temp_c": 19.5, "is_weekend": True}
+
+city = r["city"]
+temp_c = r["temp_c"]
+is_weekend = r["is_weekend"]
+
+print(f"In {city}, temp is {temp_c}C. Weekend? {is_weekend}")
+```
+
+---
+
+## Session 2 recap
+
+- Values + containers
+- Operators and truthiness
+- Lists/dicts basics
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll start writing real scripts and reading files.
+
+# Session 3
+
+::: {.muted}
+Control flow + strings/lists/dicts + files
+:::
+
+---
+
+## Session 3 objectives
+
+- Use `if/elif/else` and conditional expressions
+- Loop with `for` and `while`
+- Handle errors with `try/except`
+- Read and write text files with `with open(...)`
+- Use strings + lists + dicts to build a report
+
+---
+
+## Python syntax 101: indentation + blocks
+
+In Python, whitespace is part of the syntax.
+
+- A `:` starts a block
+- The indented lines belong to that block
+
+```python
+if 5 > 3:
+    print("Yes")
+    print("Still inside")
+print("Back outside")
+```
+
+Comments start with `#`.
+
+---
+
+## `if` in practice
+
+```python
+grade = 83
+if grade >= 90:
+    letter = "A"
+elif grade >= 80:
+    letter = "B"
+else:
+    letter = "C or below"
+print(letter)
+```
+
+---
+
+## One-line condition (ternary)
+
+```python
+number = 7
+parity = "even" if number % 2 == 0 else "odd"
+print(parity)
+```
+
+---
+
+## `for` loops: your default loop
+
+```python
+names = ["Aisha", "Fahad", "Noor"]
+for name in names:
+    print(name)
+```
+
+**Pattern you’ll use for CSV:** loop over rows, update counters.
+
+---
+
+## List comprehensions (loop → list)
+
+A compact way to build a new list from a loop.
+
+```python
+nums = [1, 2, 3, 4, 5]
+squares = [n * n for n in nums]
+plus_one = [n + 1 for n in nums]
+```
+
+Use when it’s short and clear. Otherwise, use a normal `for` loop.
+
+---
+
+## Loop helpers: `range`, `enumerate`, `zip`
+
+```python
+for i in range(3):
+    print(i)
+
+names = ["Aisha", "Fahad"]
+for i, name in enumerate(names, start=1):
+    print(i, name)
+
+ages = [23, 31]
+for name, age in zip(names, ages):
+    print(name, age)
+```
+
+---
+
+## `while` loops: when you don’t know “how many”
+
+```python
+i = 0
+while i < 3:
+    print(i)
+    i += 1
+```
+
+---
+
+## Common loop controls
+
+- `continue` → skip to next iteration
+- `break` → stop the loop
+
+```python
+for x in "abcdef":
+    if x == "b":
+        continue
+    if x == "e":
+        break
+    print(x)
+```
+
+---
+
+## Quick Check
+
+What prints?
+
+```python
+for x in [1, 2, 3, 4]:
+    if x % 2 == 0:
+        continue
+    print(x)
+```
+
+. . .
+
+**Answer:** `1` then `3`
+
+---
+
+## `match`: clean branching (Python 3.10+)
+
+```python
+cmd = input("Command: ")
+match cmd:
+    case "stats":
+        print("Show stats")
+    case "help":
+        print("Show help")
+    case _:
+        print("Unknown command")
+```
+
+---
+
+## Assertions: enforce assumptions
+
+```python
+age = 250
+assert 0 <= age <= 200, "Age must be realistic"
+```
+
+Use this to catch “impossible states” early.
+
+---
+
+## Errors happen — handle them
+
+```python
+try:
+    x = int(input("Enter a number: "))
+    print(1 / x)
+except ValueError:
+    print("That was not a number")
+except ZeroDivisionError:
+    print("We cannot divide by zero")
+```
+
+---
+
+## Files: always use `with open(...)`
+
+```python
+with open("notes.txt", mode="w") as f:
+    f.write("Hello file!\n")
+
+with open("notes.txt", mode="r") as f:
+    print(f.read())
+```
+
+---
+
+## Strings: indexing + methods
+
+```python
+s = "  Data,Data,AI  "
+print(s.strip())
+print(s.lower())
+print(s.split(","))
+
+lines = ["one", "two", "three"]
+print("\n".join(lines))
+```
+
+---
+
+## f-strings: formatting options (review)
+
+```python
+name = "Noor"
+score = 91.23456
+print(f"{name} scored {score:.2f}")  # keep 2 decimals
+
+
+```
+
+---
+
+## Functions: named steps you can reuse {.smaller}
+
+When code gets longer, put pieces into **functions**.
+
+```python
+def greet(name):
+    message = f"Hello, {name}!"
+    return message
+
+print(greet("Aisha"))
+```
+
+Two key ideas:
+
+- `def` starts a function
+- `return` sends a value back to the caller
+
+While drafting, you might also see:
+
+- `pass` → “do nothing for now” (a placeholder)
+
+---
+
+## Modules: importing code from another file {.smaller}
+
+If you create a file `math_tools.py`:
+
+```python
+# math_tools.py
+def double(x):
+    return 2 * x
+```
+
+You can use it from `main.py` in the **same folder**:
+
+```python
+from math_tools import double
+
+print(double(5))
+```
+
+A folder can also be a **package** if it contains an `__init__.py` file:
+
+```text
+csv_profiler/
+  __init__.py
+  io.py
+  profile.py
+```
+
+Then you can import from it like:
+
+```python
+from csv_profiler.io import read_csv_rows
+```
+
+---
+
+## The “main guard” (why we use it)
+
+In many projects, `main.py` can be:
+
+- run directly (`python main.py`)
+- imported by other code
+
+This pattern makes sure code runs **only when executed as a script**:
+
+```python
+def main():
+    print("Running!")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Built-ins you’ll use in profilers
+
+- `len(rows)` → row count
+- `min(numbers)`, `max(numbers)` → extremes
+- `sum(numbers) / len(numbers)` → mean
+- `sorted(items)` → ordering
+- `enumerate(items)` → index + value
+
+```python
+names = ["Aisha", "Fahad"]
+for i, name in enumerate(names, start=1):
+    print(i, name)
+```
+
+::: aside
+We’ll add numeric stats tomorrow.
+:::
+
+---
+
+## Lists + dicts: the report builder pattern
+
+You will build a report like:
+
+```python
+report = {
+  "rows": 120,
+  "columns": {
+     "age": {"missing": 2, "type": "number"},
+     "city": {"missing": 0, "type": "text"}
+  }
+}
+```
+
+---
+
+## Micro-exercise: count missing values (8 minutes)
+
+Given this list of rows:
+
+```python
+rows = [
+  {"age": "19", "city": "Riyadh"},
+  {"age": "",   "city": "Jeddah"},
+  {"age": "20", "city": ""},
+]
+```
+
+Write code that counts missing values **per column**.
+
+**Rule:** treat empty string `""` as missing.
+
+---
+
+## Solution (one good approach)
+
+```python
+missing = {"age": 0, "city": 0}
+for row in rows:
+    for col in missing:
+        if row[col] == "":
+            missing[col] += 1
+print(missing)
+```
+
+---
+
+## Session 3 recap
+
+- Control flow: if / loops / match
+- Files: `with open(...)`
+- Report pattern: nested dicts
+
+# Isha break  {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we start building the weekly project.
+
+# Hands-on
+
+::: {.muted}
+Build the project: CSV Profiler (Part 1)
+:::
+
+---
+
+## Vibe coding (safe version)
+
+1. Plan first (write steps in English)
+2. Implement small increments
+3. Run → break → read error → fix
+4. Commit frequently
+5. Repeat
+
+::: callout-warning
+Do not ask GenAI to write your solution code. Ask it to explain concepts or errors.
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+By the end of the day, you should have:
+
+- A project folder with `.venv/`
+- A Python package `csv_profiler/`
+- Code that:
+  - reads a CSV
+  - computes basic profile (rows/cols, missing counts)
+  - writes `report.json` and `report.md`
+
+---
+
+## Today’s project layout (minimal) {.smaller}
+
+For Day 1, we’ll keep things simple so imports “just work”.
+
+```text
+bootcamp/
+  csv-profiler/
+    .venv/
+    main.py
+    csv_profiler/
+      __init__.py
+      io.py
+      profile.py
+      render.py
+    data/
+      sample.csv
+    outputs/
+      report.json
+      report.md
+```
+
+::: aside
+Later this week, we’ll switch to a more “professional” layout with `pyproject.toml` and a `src/` folder.
+:::
+
+---
+
+## By Thursday: target layout (we’ll refactor later)
+
+```text
+csv-profiler/
+  pyproject.toml
+  README.md
+  src/
+    csv_profiler/
+      ...
+  data/
+  outputs/
+```
+
+---
+
+## Task 0 — Create the project (10 minutes)
+
+1. Inside `bootcamp/`, create a folder `csv-profiler/`
+2. `cd csv-profiler`
+3. Create an env: `uv venv -p 3.11`
+
+**Checkpoint:** you have `.venv/` inside `csv-profiler/`.
+
+---
+
+## Task 0 — Suggested commands
+
+```bash
+cd ~/bootcamp
+mkdir csv-profiler
+cd csv-profiler
+uv venv -p 3.11
+```
+
+---
+
+## Task 1 — Add a sample CSV (8 minutes)
+
+Create `data/sample.csv` with this content:
+
+```csv
+name,age,city,salary
+Aisha,23,Riyadh,12000
+Fahad,,Jeddah,9000
+Noor,29,,
+Salem,31,Dammam,15000
+```
+
+**Checkpoint:** you can open it in VS Code.
+
+---
+
+## Task 2 — Create package skeleton (10 minutes)
+
+Create these files (match the **minimal layout** slide):
+
+- `csv_profiler/__init__.py`
+- `csv_profiler/io.py`
+- `csv_profiler/profile.py`
+- `csv_profiler/render.py`
+- `main.py` *(entrypoint for today)*
+
+::: aside
+`__init__.py` can be empty for now — it just marks the folder as a package.
+:::
+
+---
+
+## Task 2 — Minimal `main.py`
+
+Paste this first:
+
+```python
+from csv_profiler.io import read_csv_rows
+from csv_profiler.profile import basic_profile
+from csv_profiler.render import write_json, write_markdown
+
+def main():
+    rows = read_csv_rows("data/sample.csv")
+    report = basic_profile(rows)
+    write_json(report, "outputs/report.json")
+    write_markdown(report, "outputs/report.md")
+    print("Wrote outputs/report.json and outputs/report.md")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Reading CSVs in Python: `csv.DictReader`
+
+Python’s standard library has a `csv` module.
+
+```python
+import csv
+
+with open("data/sample.csv", "r", encoding="utf-8", newline="") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row)          # a dict: column_name -> cell_value (strings)
+        break
+```
+
+Notes:
+
+- CSV values come in as **strings** (even numbers)
+- Missing cells usually come in as the empty string `""`
+
+---
+
+## Task 3 — Implement CSV reading (15 minutes)
+
+In `csv_profiler/io.py` implement:
+
+```python
+import csv
+
+
+def read_csv_rows(path):
+    """Read a CSV as a list of rows (each row is a dict of strings)."""
+    # TODO: implement
+    pass
+```
+
+Rules:
+
+- Use `with open(..., newline="")`
+- Use `csv.DictReader` to parse rows
+- Return a list of dictionaries (one dict per row)
+
+---
+
+## Solution — `read_csv_rows` (example)
+
+```python
+import csv
+
+
+def read_csv_rows(path):
+    with open(path, "r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        return list(reader)
+```
+
+---
+
+## Task 4 — Compute a basic profile (20 minutes)
+
+In `csv_profiler/profile.py`, implement:
+
+```python
+def basic_profile(rows):
+    """Compute row count, column names, and missing values per column."""
+    # TODO: implement
+    pass
+```
+
+Definition of **missing** today:
+
+- empty string after stripping whitespace
+
+---
+
+## Hint — how to get columns
+
+If there is at least one row:
+
+```python
+columns = list(rows[0].keys())
+```
+
+Then loop rows and update counts.
+
+---
+
+## Solution — `basic_profile` (day-1 version) {.smaller}
+
+```python {code-line-numbers="1-3|5-10|12-14|15-18|20-23|"}
+def basic_profile(rows):
+    if not rows:
+        return {"rows": 0, "n_cols": 0, "columns": [], "missing": {}, "non_empty": {}}
+
+    columns = list(rows[0].keys())
+    missing = {}
+    non_empty = {}
+    for c in columns:
+        missing[c] = 0
+        non_empty[c] = 0
+
+    for row in rows:
+        for c in columns:
+            v = row[c].strip()
+            if v == "":  # DictReader gives empty string for missing cells
+                missing[c] += 1
+            else:
+                non_empty[c] += 1
+
+    return {
+        "rows": len(rows), "n_cols": len(columns), "columns": columns,
+        "missing": missing, "non_empty": non_empty
+    }
+```
+
+---
+
+## Optional (stretch): start type inference {.smaller}
+
+Goal: infer a simple type label per column:
+
+- `number` if all non-empty values can be parsed as float
+- `text` otherwise
+
+Pseudo-steps:
+
+1. For each column, collect its non-empty strings
+2. Try `float(value)` in a `try/except ValueError`
+3. If any value fails → `text`
+
+Example helper:
+
+```python
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+```
+
+---
+
+## Task 5 — Write JSON output (10 minutes)
+
+In `csv_profiler/render.py` implement:
+
+```python
+import json
+import os
+
+
+def write_json(report, path):
+    """Write the report dict to a JSON file."""
+    # TODO: implement
+    pass
+```
+
+Requirements:
+
+- Create the parent folder if it doesn’t exist
+- Pretty-print with indentation
+
+---
+
+## Solution — `write_json`
+
+```python
+import json
+import os
+
+
+def write_json(report, path):
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+```
+
+---
+
+## Task 6 — Write Markdown output (15 minutes)
+
+Implement:
+
+```python
+def write_markdown(report, path):
+    """Write a human-readable Markdown report."""
+    # TODO: implement
+    pass
+```
+
+Markdown should include:
+
+- Title
+- Rows + columns
+- A small table: column name + missing count
+
+---
+
+## Solution — `write_markdown` (simple) {.smaller}
+
+```python
+import os
+
+
+def write_markdown(report, path):
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+
+    cols = report.get("columns", [])
+    missing = report.get("missing", {})
+    lines = []
+    lines.append("# CSV Profiling Report\n")
+    lines.append(f"- Rows: **{report.get('rows', 0)}**")
+    lines.append(f"- Columns: **{report.get('n_cols', 0)}**\n")
+
+    lines.append("## Missing Values\n")
+    lines.append("| column | missing |")
+    lines.append("|---|---:|")
+    for c in cols:
+        lines.append(f"| {c} | {missing.get(c, 0)} |")
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+```
+
+---
+
+## Task 7 — Run it end-to-end (10 minutes)
+
+From the project root:
+
+```bash
+uv run main.py
+```
+
+Then open:
+
+- `outputs/report.json`
+- `outputs/report.md`
+
+**Checkpoint:** both files exist and match the sample CSV.
+
+---
+
+## Debug playbook (when it fails)
+
+1. Read the **first error line** (most important)
+2. Confirm the file path is correct
+3. Print intermediate values (`print(rows[0])`)
+4. Reduce the problem (try 1 row)
+
+---
+
+## Stretch (if you finish early)
+
+Add one more section to the Markdown:
+
+- **Non-empty counts** per column
+
+Bonus:
+
+- A `top_values` list for text columns (most common values)
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**What was the most confusing part today: paths, environments, or Python control flow?**
+
+---
+
+## What to do after class (Day 1 assignment)
+
+**Due:** before Day 2 starts
+
+1. Make your code work on `data/sample.csv`
+2. Change the sample CSV (add 2 rows) and rerun
+3. Update `report.md` to include a short “Notes” section
+
+**Deliverable:** a zip or folder with your `csv-profiler/` project.
+
+::: callout-tip
+Tomorrow we’ll refactor into functions + modules and add better type inference.
+:::
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

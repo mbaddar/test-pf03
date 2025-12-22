@@ -1,0 +1,1567 @@
+---
+pagetitle: "W2 D1"
+title: "Data Work (ETL + EDA)"
+subtitle: "AI Professionals Bootcamp | Week 2"
+date: 2025-12-21
+---
+
+## Policy: GenAI usage
+
+- ✅ Allowed: **clarifying questions** (definitions, error explanations)
+- ❌ Not allowed: generating code, writing solutions, or debugging by copy-paste
+- If unsure: ask the instructor first
+
+::: callout-tip
+**In this course:** you build skill by typing, running, breaking, and fixing.
+:::
+
+---
+
+## Week 2 admin (what to optimize for)
+
+This week is **Data Work (ETL + EDA)**.
+
+* Internet is **not reliable** → we work **offline-first**
+* Use GitHub **daily** (small commits)
+* Prefer **one plotting library** (Plotly) later this week
+* Notebooks should read from **`data/processed/`**, not `data/raw/`
+
+::: callout-tip
+If your results change unexpectedly: check inputs, check dtypes, check joins, check row counts.
+:::
+
+---
+
+## Tool stack this week (minimal + high ROI)
+
+* **pandas** — load/clean/join/reshape/EDA
+* **pyarrow + Parquet** — fast, typed processed files
+* **httpx** — extraction (but cached)
+* **logging** — visibility + audit trail
+* **Plotly** *(Day 4)* — one plotting library
+* **DuckDB** *(Day 5)* — quick local SQL on files
+
+::: {.muted}
+Rule: avoid tool sprawl. Keep it small and shippable.
+:::
+
+---
+
+## Canonical workflow (repeat every project)
+
+1. **Load** (raw/cache)
+2. **Verify** (schema, dtypes, keys, row counts)
+3. **Clean** (missingness, duplicates, normalization)
+4. **Transform** (joins, reshape, features)
+5. **Analyze** (tables + comparisons)
+6. **Visualize** (Plotly, export figures)
+7. **Conclude** (written summary + caveats)
+
+::: aside
+This week: notebooks should focus on **steps 4–7** using `data/processed/`.
+:::
+
+# Day 1: Foundations for an Offline‑First Data Workflow
+
+**Goal:** set up a clean project scaffold and produce your **first processed Parquet** output (typed, reproducible).
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+Say: “Today is foundations. If you get the structure right, everything else becomes easier.”
+Do: show a processed Parquet file on disk + open it in pandas.
+Ask: “What’s the difference between raw and processed data?”
+:::
+
+---
+
+## Today’s Flow
+
+* **Session 1 (60m):** Offline-first mindset + project layout
+* *Asr Prayer (20m)*
+* **Session 2 (60m):** Data sources + caching patterns
+* *Maghrib Prayer (20m)*
+* **Session 3 (60m):** pandas I/O + schema basics
+* *Isha Prayer (20m)*
+* **Hands-on (120m):** Scaffold repo + load raw → processed Parquet
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+* explain **raw vs cache vs processed** and why it matters
+* scaffold a repo with a standard **data project layout**
+* read CSV with **explicit dtypes** (avoid silent inference)
+* write **Parquet** outputs to `data/processed/`
+* implement a small **schema enforcement** step (`enforce_schema`)
+* push a working Day 1 baseline to GitHub
+
+---
+
+## Warm-up (5 minutes)
+
+Create a new Week 2 folder and confirm Python works.
+
+**macOS/Linux**
+
+```bash
+mkdir -p week2-data-work && cd week2-data-work
+python -V
+python -c "import sys; print(sys.executable)"
+```
+
+**Windows PowerShell**
+
+```powershell
+mkdir week2-data-work
+cd week2-data-work
+python -V
+python -c "import sys; print(sys.executable)"
+```
+
+**Checkpoint:** you can run Python and see a version + executable path.
+
+---
+
+## This week’s project (high-level)
+
+**Project:** *Offline‑First ETL + EDA Mini Analytics Pipeline*
+
+You will ship:
+
+* ETL code that runs end‑to‑end (load → verify → clean → transform → write)
+* `data/processed/*.parquet` outputs that are **idempotent**
+* an EDA notebook that reads **only processed** data
+* a short `reports/summary.md` (findings + caveats)
+
+---
+
+## End-state (by end of today)
+
+By the end of Day 1, your repo should contain:
+
+* a standard folder layout (`data/`, `src/`, `scripts/`, `reports/`)
+* `src/<package>/config.py` and `src/<package>/io.py`
+* a run script that writes at least one file to `data/processed/`
+* at least **one commit pushed** to GitHub
+
+# Session 1
+
+::: {.muted}
+Offline-first mindset + project layout
+:::
+
+---
+
+## Session 1 objectives
+
+By the end of this session, you can:
+
+* define **offline-first** for data work
+* explain the purpose of `raw/`, `cache/`, `processed/`
+* describe “raw immutable” and “processed idempotent”
+* centralize project paths using `pathlib.Path`
+
+---
+
+## Context: why “offline-first” is worth it
+
+You will re-run your ETL many times:
+
+* debugging
+* adding a new cleaning rule
+* fixing a dtype bug
+* adding a new feature column
+
+If your pipeline depends on the internet, you lose time.
+
+---
+
+## Concept: raw vs cache vs processed
+
+Offline-first projects separate data by **role**:
+
+* **raw:** original snapshots (never edited)
+* **cache:** downloaded/API responses (safe to delete)
+* **processed:** clean, typed outputs (safe to re-create)
+
+---
+
+## Example: folder roles (mental model)
+
+:::: {.columns}
+::: {.column width="30%"}
+**`data/raw/`**
+
+* immutable inputs
+* “source of truth”
+* never edited
+:::
+
+::: {.column width="30%"}
+**`data/cache/`**
+
+* API responses
+* intermediate downloads
+* safe to delete
+:::
+
+::: {.column width="40%"}
+**`data/processed/`**
+
+* clean + typed
+* analysis-ready
+* idempotent outputs
+:::
+::::
+
+---
+
+## Conventions that prevent pain (Day 1 baseline) {.smaller}
+
+* **Raw is immutable**: never edit files under `data/raw/`
+* **Cache is disposable**: safe to delete and re-fetch
+* **Processed is idempotent**: safe to overwrite every run
+* **One source of truth for paths**: `Path` objects + `config.py`
+* **Schema-aware**: IDs as strings; enforce dtypes after load
+* **Determinism**: if you ever simulate (bootstrap), pin a seed; record config + commit when possible
+* **Separation of concerns**:
+  * `io.py` loads/saves
+  * `transforms.py` cleans/transforms
+  * notebooks analyze/visualize
+
+::: {.notes}
+Say: “When these are violated, teams waste days debugging ghosts.”
+:::
+
+---
+
+## Micro-exercise: classify these files (4 minutes)
+
+Put each file into the correct folder:
+
+1. `orders.csv` you received from a teammate
+2. `users_api_page_1.json` downloaded from an endpoint
+3. `orders_clean.parquet` generated by your ETL
+4. `country_codes.xlsx` you manually downloaded as reference data
+
+**Checkpoint:** you can justify your choices in 1 sentence each.
+
+---
+
+## Solution: classification
+
+1. `orders.csv` → `data/raw/`
+2. `users_api_page_1.json` → `data/cache/`
+3. `orders_clean.parquet` → `data/processed/`
+4. `country_codes.xlsx` → `data/external/` *(reference drop)*
+
+---
+
+## Context: why idempotency matters
+
+If you re-run ETL 20 times…
+
+* you **must not** duplicate rows
+* your outputs should not “drift” randomly
+* debugging should be possible
+
+Idempotent outputs make reruns safe.
+
+---
+
+## Concept: idempotent processed outputs
+
+**Idempotent:** running the pipeline again produces the same outputs (same inputs/config).
+
+Good pattern:
+
+* overwrite `data/processed/orders.parquet` every run
+
+Bad pattern:
+
+* append to `data/processed/orders.csv` every run
+
+---
+
+## Example: overwrite vs append
+
+**Bad (append)**
+
+```python
+df.to_csv("data/processed/orders.csv", mode="a", index=False)
+```
+
+**Good (overwrite)**
+
+```python
+df.to_parquet("data/processed/orders.parquet", index=False)
+```
+
+---
+
+## Micro-exercise: idempotent or not? (3 minutes)
+
+Which is idempotent?
+
+A) `df.to_csv("processed.csv", mode="a")`
+B) `df.to_parquet("processed.parquet", index=False)` *(overwrite)*
+
+**Checkpoint:** explain what happens on the 2nd run.
+
+---
+
+## Solution: idempotent or not?
+
+* **A is NOT idempotent** (duplicates accumulate every run)
+* **B is idempotent** if the file is overwritten each run
+
+---
+
+## Quick Check
+
+**Question:** What is the most common symptom of a non‑idempotent pipeline?
+
+. . .
+
+**Answer:** row counts grow every run, even when inputs did not change.
+
+---
+
+## Context: project layout prevents “path chaos”
+
+If everyone uses different paths:
+
+* notebooks break
+* scripts break
+* teammates can’t run your repo
+
+We fix this with a consistent layout + a central paths config.
+
+---
+
+## Concept: standard folder layout (minimum viable)
+
+A simple, robust structure:
+
+* `data/` (raw/cache/processed)
+* `src/` (reusable code)
+* `scripts/` (entrypoints)
+* `notebooks/` (EDA reads processed)
+* `reports/` (figures + summary)
+
+---
+
+## Example: repo tree (Day 1 target)
+
+```text
+week2-data-work/
+  data/{raw,cache,processed,external}/
+  notebooks/
+  reports/figures/
+  scripts/
+  src/bootcamp_data/
+    __init__.py
+    config.py
+    io.py
+```
+
+---
+
+## Important: how Python finds your code (`src/` layout) {.smaller}
+
+Your package lives at:
+
+* `src/bootcamp_data/`
+
+When you run a script, Python must know where `src/` is, otherwise you’ll see:
+
+`ModuleNotFoundError: No module named 'bootcamp_data'`
+
+Two practical ways to fix it:
+
+1. **(Recommended today)** add a small `sys.path` setup at the top of scripts (shown later)
+2. **Alternative** set `PYTHONPATH=src` when running Python
+
+::: callout-tip
+If imports fail, don’t “randomly reinstall”. Fix the import path first.
+:::
+
+---
+
+## Micro-exercise: “Where does this go?” (4 minutes)
+
+Place each item:
+
+* `notebooks/eda.ipynb`
+* `src/bootcamp_data/io.py`
+* `data/processed/orders.parquet`
+* `scripts/run_day1_load.py`
+
+**Checkpoint:** you placed all 4 correctly.
+
+---
+
+## Solution: “Where does this go?”
+
+* `notebooks/eda.ipynb` → `notebooks/`
+* `src/bootcamp_data/io.py` → `src/bootcamp_data/`
+* `data/processed/orders.parquet` → `data/processed/`
+* `scripts/run_day1_load.py` → `scripts/`
+
+---
+
+## Quick Check
+
+**Question:** What folder should notebooks read from?
+
+. . .
+
+**Answer:** `data/processed/` (not `data/raw/`).
+
+---
+
+## Context: one source of truth for paths
+
+Hardcoding strings like `"../data/raw/orders.csv"` breaks when:
+
+* you move files
+* you run from a different working directory
+* someone uses Windows paths
+
+Use `pathlib.Path` + a central `config.py`.
+
+---
+
+## Example: `Paths` + `make_paths` (pattern) {.smaller}
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass(frozen=True)
+class Paths:
+    root: Path
+    raw: Path
+    cache: Path
+    processed: Path
+    external: Path
+
+def make_paths(root: Path) -> Paths:
+    data = root / "data"
+    return Paths(
+        root=root,
+        raw=data / "raw",
+        cache=data / "cache",
+        processed=data / "processed",
+        external=data / "external",
+    )
+```
+
+---
+
+## Micro-exercise: complete `make_paths` (5 minutes) {.smaller}
+
+Create `src/bootcamp_data/config.py` with:
+
+1. a `Paths` dataclass
+2. a `make_paths(root: Path)` function
+3. `raw/cache/processed/external` paths under `root/data/`
+
+**Checkpoint:** `python -c "import sys, pathlib; sys.path.insert(0, 'src'); from bootcamp_data.config import make_paths; print(make_paths(pathlib.Path('.').resolve()).raw)"` prints a real path.
+
+---
+
+## Solution: `config.py` (example) {.smaller}
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass(frozen=True)
+class Paths:
+    root: Path
+    raw: Path
+    cache: Path
+    processed: Path
+    external: Path
+
+def make_paths(root: Path) -> Paths:
+    data = root / "data"
+    return Paths(
+        root=root,
+        raw=data / "raw",
+        cache=data / "cache",
+        processed=data / "processed",
+        external=data / "external",
+    )
+```
+
+---
+
+## Quick Check
+
+**Question:** Why use `Path` objects instead of plain strings?
+
+. . .
+
+**Answer:** `Path` handles OS differences and path joining safely (`root / "data" / "raw"`).
+
+---
+
+## Session 1 recap
+
+* Offline-first = your project runs without internet
+* Separate data by role: **raw / cache / processed**
+* Processed outputs should be **idempotent**
+* Centralize paths with `pathlib.Path` in `config.py`
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** open your repo and locate `data/raw`, `data/processed`, and `src/`.
+
+# Session 2
+
+::: {.muted}
+Data sources + caching patterns
+:::
+
+---
+
+## Session 2 objectives
+
+By the end of this session, you can:
+
+* describe common data sources (CSV/JSON/API)
+* define a minimal **extraction checklist**
+* store minimal **extraction metadata**
+* implement an offline-first **cache read/write** pattern
+
+---
+
+## Context: extraction is where “silent drift” starts
+
+Two common failure modes:
+
+* upstream data changes → your results change
+* your extraction fails partially → you analyze incomplete data
+
+Your job: make extraction reproducible.
+
+---
+
+## Concept: minimal extraction checklist
+
+Before you trust extracted data:
+
+* did you get **all pages** (pagination)?
+* did you record **params/time window**?
+* did you store a **snapshot** (cache)?
+* did you validate **row count / file size**?
+
+---
+
+## Example: minimal extraction metadata (JSON)
+
+```json
+{
+  "timestamp_utc": "2025-12-21T09:15:00Z",
+  "source": "api",
+  "endpoint": "/v1/users",
+  "params": {"page": 1, "per_page": 100},
+  "status_code": 200
+}
+```
+
+::: {.muted}
+Store this next to the cached file (same name + `.meta.json`).
+:::
+
+---
+
+## Micro-exercise: write metadata (5 minutes)
+
+You downloaded `data/cache/users_page_1.json`.
+
+Create a matching metadata file:
+
+* `data/cache/users_page_1.meta.json`
+* include: timestamp, endpoint, params, status_code
+
+**Checkpoint:** you have a valid JSON file on disk.
+
+---
+
+## Solution: metadata example
+
+```json
+{
+  "timestamp_utc": "2025-12-21T09:15:00Z",
+  "source": "api",
+  "endpoint": "/v1/users",
+  "params": {"page": 1, "per_page": 100},
+  "status_code": 200
+}
+```
+
+---
+
+## Quick Check
+
+**Question:** If you don’t store `params`, what breaks later?
+
+. . .
+
+**Answer:** you can’t reproduce *which* slice of data you extracted (numbers won’t match).
+
+---
+
+## Context: caching keeps you productive
+
+Internet is unreliable.
+
+Caching means:
+
+* first run: download → save to `data/cache/`
+* next runs: read from cache (fast, offline)
+
+---
+
+## Concept: offline-first caching policy
+
+Operational rule:
+
+* if cache exists → use it
+* only re-download when you *choose* (TTL or manual delete)
+
+This prevents “live calls” from breaking your workflow.
+
+---
+
+## Example: `fetch_json_cached` (offline-first) {.smaller}
+
+```python
+from pathlib import Path
+import json
+import time
+import httpx
+
+def fetch_json_cached(url: str, cache_path: Path, *, ttl_s: int | None = None) -> dict:
+    """Offline-first JSON fetch with optional TTL."""
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Offline-first default: if cache exists, use it (unless TTL says it's too old)
+    if cache_path.exists():
+        age_s = time.time() - cache_path.stat().st_mtime
+        if ttl_s is None or age_s < ttl_s:
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+
+    # Otherwise: fetch and overwrite cache
+    with httpx.Client(timeout=20.0) as client:
+        r = client.get(url)
+        r.raise_for_status()
+        data = r.json()
+
+    cache_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
+```
+
+---
+
+## Micro-exercise: predict behavior (4 minutes)
+
+Assume `cache_path` exists.
+
+What happens?
+
+1. `ttl_s=None`
+2. `ttl_s=3600` and cache age is 10 minutes
+3. `ttl_s=3600` and cache age is 3 days
+
+**Checkpoint:** you can answer all 3 without running code.
+
+---
+
+## Solution: predict behavior
+
+1. `ttl_s=None` → **read from cache** (offline-first default)
+2. `ttl_s=3600` and age 10m → **read from cache**
+3. `ttl_s=3600` and age 3d → **re-download** then overwrite cache
+
+---
+
+## Quick Check
+
+**Question:** When is `ttl_s=None` a good default?
+
+. . .
+
+**Answer:** when you want your workflow to run offline and only refresh cache manually.
+
+---
+
+## Context: CSV is a “lowest common denominator”
+
+CSV is common, but it is fragile:
+
+* encoding surprises
+* separators differ (`;` vs `,`)
+* decimal separators differ (`1,23` vs `1.23`)
+* missing value markers vary (`NA`, `null`, empty)
+
+---
+
+## Concept: read_csv guardrails (high ROI options)
+
+When reading CSV, consider:
+
+* `dtype=` (especially IDs)
+* `na_values=` (custom missing markers)
+* `encoding=`
+* `sep=`
+* `decimal=`
+
+---
+
+## Micro-exercise: choose options (4 minutes)
+
+Scenario:
+
+* separator is `;`
+* decimals use comma: `12,50`
+* IDs like `0007` must keep leading zeros
+
+Which options do you set?
+
+**Checkpoint:** you can write the `pd.read_csv(...)` call with those options.
+
+---
+
+## Solution: `pd.read_csv` options (example)
+
+```python
+df = pd.read_csv(
+    path,
+    sep=";",
+    decimal=",",
+    dtype={"user_id": "string", "order_id": "string"},
+    na_values=["", "NA", "null"],
+)
+```
+
+---
+
+## Session 2 recap
+
+* Extraction must be reproducible (cache + metadata)
+* Offline-first caching: reuse cache when present
+* CSV needs guardrails (`dtype`, `sep`, `decimal`, `na_values`)
+* Next: implement typed I/O and write Parquet outputs
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** open VS Code (or your editor) and get ready to write `io.py`.
+
+# Session 3
+
+::: {.muted}
+pandas I/O + schema basics
+:::
+
+---
+
+## Session 3 objectives
+
+By the end of this session, you can:
+
+* explain why pandas dtype inference can be dangerous
+* read CSV with explicit dtypes (IDs as strings)
+* write and read **Parquet** with pandas
+* implement a minimal `enforce_schema(df)` transform
+
+---
+
+## Context: pandas inference can silently corrupt meaning
+
+If pandas guesses wrong, you might lose information **without an error**.
+
+Classic example:
+
+* ID `00123` becomes `123` (leading zeros lost forever)
+
+---
+
+## Concept: treat IDs as strings
+
+Operational rules:
+
+* **IDs are strings** unless you truly compute on them
+* use pandas nullable dtypes when missing values exist:
+* `"string"`, `"Int64"`, `"Float64"`, `"boolean"`
+
+---
+
+## Tiny “manual ↔ pandas” bridge {.smaller}
+
+APIs and scraped data often start as Python lists/dicts. pandas is just a convenient **table layer** on top.
+
+```python
+import pandas as pd
+
+# manual (list of dicts) → DataFrame
+rows = [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+df = pd.DataFrame(rows)
+
+# DataFrame → manual (records)
+records = df.to_dict(orient="records")
+```
+
+Use cases:
+
+* quick debugging (`records[:3]`)
+* small unit tests
+* converting cached JSON → DataFrame
+
+---
+
+## Example: the leading-zero bug
+
+```python
+import pandas as pd
+df = pd.read_csv("orders.csv")
+df.dtypes
+```
+
+**Risk**
+
+* `user_id` becomes `int64`
+* `0007` becomes `7`
+* joins fail later
+
+---
+
+## Micro-exercise: choose dtypes (5 minutes)
+
+You have `orders.csv` with columns:
+
+* `order_id`, `user_id`, `amount`, `quantity`, `created_at`, `status`
+
+Write a `dtype={...}` mapping for the **IDs**.
+
+**Checkpoint:** your mapping keeps leading zeros.
+
+---
+
+## Solution: dtype mapping (IDs)
+
+```python
+dtype = {
+    "order_id": "string",
+    "user_id": "string",
+}
+```
+
+---
+
+## Quick Check
+
+**Question:** If `quantity` is an integer but has missing values, what dtype should you use?
+
+. . .
+
+**Answer:** `"Int64"` (nullable integer), not plain `int64`.
+
+---
+
+## Context: centralize I/O in `io.py`
+
+If every notebook reads data differently:
+
+* missing values differ
+* dtypes differ
+* results differ
+
+Centralized I/O makes team work consistent.
+
+---
+
+## Concept: three core I/O helpers
+
+In `src/bootcamp_data/io.py`:
+
+* `read_orders_csv(path) -> DataFrame`
+* `read_users_csv(path) -> DataFrame`
+* `write_parquet(df, path) -> None`
+* `read_parquet(path) -> DataFrame`
+
+---
+
+## Example: `io.py` pattern
+
+```python
+from pathlib import Path
+import pandas as pd
+
+NA = ["", "NA", "N/A", "null", "None"]
+
+def read_orders_csv(path: Path) -> pd.DataFrame:
+    return pd.read_csv(
+        path,
+        dtype={"order_id": "string", "user_id": "string"},
+        na_values=NA,
+        keep_default_na=True,
+    )
+
+def write_parquet(df: pd.DataFrame, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(path, index=False)
+```
+
+---
+
+## Micro-exercise: pick your processed filename (3 minutes)
+
+You read `data/raw/orders.csv`.
+
+Where do you write the processed output?
+
+* folder?
+* filename?
+* format?
+
+**Checkpoint:** your answer follows the raw/cache/processed rules.
+
+---
+
+## Solution: processed output target
+
+* folder: `data/processed/`
+* filename: `orders.parquet` (or `orders_clean.parquet`)
+* format: **Parquet**
+
+Example:
+
+```python
+out_path = ROOT / "data" / "processed" / "orders.parquet"
+```
+
+---
+
+## Quick Check
+
+**Question:** Why Parquet instead of CSV for processed outputs?
+
+. . .
+
+**Answer:** Parquet preserves dtypes and is faster + smaller for stable processed data.
+
+---
+
+## Context: schema enforcement is a correctness step
+
+Even with `dtype=...`, you often need:
+
+* numeric parsing (`amount`, `quantity`)
+* date parsing (later)
+* consistent missing values
+
+We enforce types after loading.
+
+---
+
+## Concept: `enforce_schema(df) -> df`
+
+A simple, testable transform:
+
+* takes a DataFrame
+* casts key columns to the right dtypes
+* does not do I/O
+
+---
+
+## Example: `enforce_schema` (minimal) {.smaller}
+
+```python
+import pandas as pd
+
+def enforce_schema(df: pd.DataFrame) -> pd.DataFrame:
+    return df.assign(
+        order_id=df["order_id"].astype("string"),
+        user_id=df["user_id"].astype("string"),
+        amount=pd.to_numeric(df["amount"], errors="coerce").astype("Float64"),
+        quantity=pd.to_numeric(df["quantity"], errors="coerce").astype("Int64"),
+    )
+```
+
+---
+
+## Micro-exercise: fill the blanks (4 minutes)
+
+Complete this safely:
+
+```python
+amount = pd.to_numeric(df["amount"], errors=____).astype("Float64")
+quantity = pd.to_numeric(df["quantity"], errors=____).astype("Int64")
+```
+
+**Checkpoint:** invalid values become missing (not crashes).
+
+---
+
+## Solution: fill the blanks
+
+```python
+amount = pd.to_numeric(df["amount"], errors="coerce").astype("Float64")
+quantity = pd.to_numeric(df["quantity"], errors="coerce").astype("Int64")
+```
+
+---
+
+## Quick Check
+
+**Question:** What does `errors="coerce"` do?
+
+. . .
+
+**Answer:** invalid values become `NaN`/missing instead of raising an exception.
+
+---
+
+## Session 3 recap
+
+* pandas dtype inference can silently break IDs
+* centralize loading/writing in `io.py`
+* write processed outputs as Parquet
+* add a small `enforce_schema` step for correctness
+
+---
+
+## Tomorrow: “Verify” becomes code (fail fast)
+
+Day 2 we’ll turn assumptions into checks, like:
+
+* required columns
+* non-empty datasets
+* unique keys (before joins)
+* missingness report (per column)
+* simple range checks (e.g., `amount >= 0`)
+
+Why it matters: catching bad data early prevents join disasters and wasted debugging.
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we will build the repo scaffold and write our first processed Parquet file.
+
+# Hands-on
+
+::: {.muted}
+Build: scaffold repo + typed I/O + first processed output
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+By the end, you should have:
+
+* a repo with the standard folder layout
+* `config.py` and `io.py` inside `src/bootcamp_data/`
+* sample raw data in `data/raw/`
+* a runnable script that writes `data/processed/orders.parquet`
+* at least **one commit pushed** to GitHub
+
+---
+
+## Project layout (target)
+
+```text
+week2-data-work/
+  data/
+    raw/            # immutable inputs
+    cache/          # API responses (optional today)
+    processed/      # your Parquet outputs
+    external/       # reference drops (optional)
+  reports/figures/
+  scripts/
+  src/bootcamp_data/
+    __init__.py
+    config.py
+    io.py
+    transforms.py   # we’ll start this today (enforce_schema)
+  README.md
+  requirements.txt
+```
+
+---
+
+## Vibe coding (safe version)
+
+1. Write the plan in 5 bullets (no code yet)
+2. Implement the smallest piece
+3. Run → break → read error → fix
+4. Commit
+5. Repeat
+
+::: callout-warning
+Do not ask GenAI to write your solution code. Ask it to explain concepts or errors.
+:::
+
+---
+
+## Task 1 — Create folders + initialize git (10 minutes)
+
+* Create the repo folders (`data/`, `src/`, `scripts/`, `reports/`)
+* Initialize git
+* Create an empty `README.md`
+
+**Checkpoint:** `git status` shows your new files.
+
+---
+
+## Solution — folders + git
+
+**macOS/Linux**
+
+```bash
+mkdir -p data/{raw,cache,processed,external}
+mkdir -p reports/figures scripts src/bootcamp_data
+touch README.md src/bootcamp_data/__init__.py
+git init
+```
+
+**Windows PowerShell**
+
+```powershell
+mkdir data, reports, scripts, src
+mkdir data\raw, data\cache, data\processed, data\external
+mkdir reports\figures
+mkdir src\bootcamp_data
+ni README.md -ItemType File
+ni src\bootcamp_data\__init__.py -ItemType File
+git init
+```
+
+---
+
+## Task 2 — Create a virtual environment + install deps (15 minutes)
+
+* Create and activate a venv
+* Install: `pandas`, `pyarrow`, `httpx`
+* Freeze `requirements.txt`
+
+**Checkpoint:** `python -c "import pandas; import pyarrow"` runs with no error.
+
+---
+
+## Hint — common install issues
+
+::: callout-warning
+If `pip install pyarrow` fails, you can still proceed today using CSV outputs,
+but Parquet is strongly preferred (ask the instructor for help).
+:::
+
+Also check you are inside your venv:
+
+* `which python` (macOS/Linux)
+* `Get-Command python` (Windows)
+
+---
+
+## Solution — venv + deps
+
+**macOS/Linux**
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+pip install pandas pyarrow httpx
+pip freeze > requirements.txt
+```
+
+**Windows PowerShell**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install pandas pyarrow httpx
+pip freeze > requirements.txt
+```
+
+---
+
+## Task 3 — Add sample raw data (10 minutes)
+
+Create two files:
+
+* `data/raw/orders.csv`
+* `data/raw/users.csv`
+
+**Checkpoint:** you can open both files and see rows + headers.
+
+---
+
+## Solution — `data/raw/orders.csv`
+
+```csv
+order_id,user_id,amount,quantity,created_at,status
+A0001,0001,12.50,1,2025-12-01T10:05:00Z,Paid
+A0002,0002,8.00,2,2025-12-01T11:10:00Z,paid
+A0003,0003,not_a_number,1,2025-12-02T09:00:00Z,Refund
+A0004,0001,25.00,,2025-12-03T14:30:00Z,PAID
+A0005,0004,100.00,1,not_a_date,paid
+```
+
+---
+
+## Solution — `data/raw/users.csv`
+
+```csv
+user_id,country,signup_date
+0001,SA,2025-11-15
+0002,SA,2025-11-20
+0003,AE,2025-11-22
+0004,SA,2025-11-25
+```
+
+---
+
+## Task 4 — Implement `config.py` (15 minutes)
+
+Create `src/bootcamp_data/config.py`:
+
+* `Paths` dataclass
+* `make_paths(root: Path) -> Paths`
+
+**Checkpoint:** running a tiny import prints a valid path.
+
+---
+
+## Hint — getting the project root right
+
+In scripts, use:
+
+```python
+ROOT = Path(__file__).resolve().parents[1]
+```
+
+Why?
+
+* `scripts/` is one level below the repo root
+* this works even when you run scripts from different folders
+
+---
+
+## Solution — `src/bootcamp_data/config.py` {.smaller}
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass(frozen=True)
+class Paths:
+    root: Path
+    raw: Path
+    cache: Path
+    processed: Path
+    external: Path
+
+def make_paths(root: Path) -> Paths:
+    data = root / "data"
+    return Paths(
+        root=root,
+        raw=data / "raw",
+        cache=data / "cache",
+        processed=data / "processed",
+        external=data / "external",
+    )
+```
+
+---
+
+## Task 5 — Implement `io.py` (20 minutes)
+
+Create `src/bootcamp_data/io.py` with:
+
+* `read_orders_csv(path: Path) -> pd.DataFrame`
+* `read_users_csv(path: Path) -> pd.DataFrame`
+* `write_parquet(df, path)`
+* `read_parquet(path)`
+
+**Checkpoint:** you can import these functions without errors.
+
+---
+
+## Hint — keep IDs as strings
+
+In both CSV readers:
+
+* set `dtype={"user_id": "string"}` (and `order_id` for orders)
+* define `NA = [...]` once
+
+::: callout-tip
+Centralizing `NA` markers makes your entire project consistent.
+:::
+
+---
+
+## Solution — `src/bootcamp_data/io.py` {.smaller}
+
+```python
+from pathlib import Path
+import pandas as pd
+
+NA = ["", "NA", "N/A", "null", "None"]
+def read_orders_csv(path: Path) -> pd.DataFrame:
+    return pd.read_csv(
+        path,
+        dtype={"order_id": "string", "user_id": "string"},
+        na_values=NA,
+        keep_default_na=True,
+    )
+def read_users_csv(path: Path) -> pd.DataFrame:
+    return pd.read_csv(
+        path,
+        dtype={"user_id": "string"},
+        na_values=NA,
+        keep_default_na=True,
+    )
+def write_parquet(df: pd.DataFrame, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(path, index=False)
+
+def read_parquet(path: Path) -> pd.DataFrame:
+    return pd.read_parquet(path)
+```
+
+---
+
+## Task 6 — Add `transforms.py` with `enforce_schema` (15 minutes)
+
+Create `src/bootcamp_data/transforms.py`:
+
+* implement `enforce_schema(df) -> df`
+* convert `amount` and `quantity` using `pd.to_numeric(..., errors="coerce")`
+
+**Checkpoint:** calling `enforce_schema` returns a DataFrame with `Float64` / `Int64` dtypes.
+
+---
+
+## Solution — `src/bootcamp_data/transforms.py` (minimal) {.smaller}
+
+```python
+import pandas as pd
+
+def enforce_schema(df: pd.DataFrame) -> pd.DataFrame:
+    return df.assign(
+        order_id=df["order_id"].astype("string"),
+        user_id=df["user_id"].astype("string"),
+        amount=pd.to_numeric(df["amount"], errors="coerce").astype("Float64"),
+        quantity=pd.to_numeric(df["quantity"], errors="coerce").astype("Int64"),
+    )
+```
+
+---
+
+## Task 7 — Write a Day 1 run script (20 minutes)
+
+Create `scripts/run_day1_load.py`:
+
+* load paths from `make_paths(ROOT)`
+* read raw CSVs
+* apply `enforce_schema` to orders
+* write Parquet outputs to `data/processed/`
+
+**Checkpoint:** running the script creates `data/processed/orders.parquet`.
+
+---
+
+## Hint — your script should log evidence
+
+Log (or print) at least:
+
+* row counts
+* dtypes
+* output paths
+
+This helps debugging later.
+
+---
+
+## Solution — `scripts/run_day1_load.py` {.smaller auto-animate=true}
+
+```python
+from pathlib import Path
+import sys
+import json
+from datetime import datetime, timezone
+import logging
+
+# Make `src/` importable when running as a script
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from bootcamp_data.config import make_paths
+from bootcamp_data.io import read_orders_csv, read_users_csv, write_parquet
+from bootcamp_data.transforms import enforce_schema
+
+log = logging.getLogger(__name__)
+
+def main() -> None:
+    ... # continue on the next slide
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+## Solution — `scripts/run_day1_load.py` {.smaller auto-animate=true}
+
+```python
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+    p = make_paths(ROOT)
+    orders = enforce_schema(read_orders_csv(p.raw / "orders.csv"))
+    users = read_users_csv(p.raw / "users.csv")
+
+    log.info("Loaded rows: orders=%s users=%s", len(orders), len(users))
+    log.info("Orders dtypes:\n%s", orders.dtypes)
+
+    out_orders = p.processed / "orders.parquet"
+    out_users = p.processed / "users.parquet"
+    write_parquet(orders, out_orders)
+    write_parquet(users, out_users)
+
+    meta = {  # Optional but useful: minimal run metadata for reproducibility
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "rows": {"orders": int(len(orders)), "users": int(len(users))},
+        "outputs": {"orders": str(out_orders), "users": str(out_users)},
+    }
+    meta_path = p.processed / "_run_meta.json"
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    log.info("Wrote: %s", p.processed)
+    log.info("Run meta: %s", meta_path)
+```
+
+::: aside
+This is the body of `main()` defined in the previous slide.
+:::
+
+---
+
+## Task 8 — Run + verify outputs (10 minutes)
+
+Run the script and verify:
+
+* processed files exist
+* IDs stayed as strings
+* `amount` has missing values for invalid rows
+
+**Checkpoint:** you can load the Parquet file back into pandas.
+
+---
+
+## Solution — run + verify
+
+```bash
+python scripts/run_day1_load.py
+python -c "import pandas as pd; \
+           df=pd.read_parquet('data/processed/orders.parquet'); \
+           print(df.dtypes); \
+           print(df.head())"
+```
+
+---
+
+## Git checkpoint (5 minutes)
+
+* `git status`
+* commit with message: `"w2d1: scaffold + typed io + first processed parquet"`
+* push to GitHub
+
+**Checkpoint:** you can see your commit online.
+
+---
+
+## Solution — git commands
+
+```bash
+git add -A
+git commit -m "w2d1: scaffold + typed io + first processed parquet"
+git branch -M main
+git remote add origin <YOUR_REPO_URL>
+git push -u origin main
+```
+
+::: {.muted}
+If you already have a remote, skip the `git remote add` step.
+:::
+
+---
+
+## Debug playbook
+
+When stuck:
+
+1. Read the full error (don’t guess)
+2. Identify: file + line number
+3. Print: `paths`, row counts, `df.dtypes`
+4. Fix the smallest thing
+5. Re-run
+
+::: callout-tip
+Most Day 1 bugs are: wrong working directory, missing venv, missing dependency, or wrong import path.
+:::
+
+---
+
+## Stretch goals (optional)
+
+If you finish early:
+
+* write `_run_meta.json` with row counts + output paths
+* add a `README.md` “How to run Day 1”
+* add a tiny check: assert `orders["user_id"].dtype == "string"`
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**Why do we keep IDs as strings and prefer Parquet for processed outputs?**
+
+---
+
+## What to do after class (Day 1 assignment)
+
+**Due:** before Day 2 starts
+
+1. Clean up your repo so it matches the target layout
+2. Ensure `scripts/run_day1_load.py` runs from a fresh terminal
+3. Push at least **one** commit to GitHub
+
+**Deliverable:** GitHub repo link + screenshot showing `data/processed/orders.parquet`.
+
+::: callout-tip
+Commit early. Commit often. Future you will thank you.
+:::
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>
