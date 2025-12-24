@@ -1,0 +1,1490 @@
+---
+pagetitle: "W2 D4"
+title: "Data Work (ETL + EDA)"
+subtitle: "AI Professionals Bootcamp | Week 2"
+date: 2025-12-24
+---
+
+## Policy: GenAI usage
+
+- ✅ Allowed: **clarifying questions** (definitions, error explanations)
+- ❌ Not allowed: generating code, writing solutions, or debugging by copy-paste
+- If unsure: ask the instructor first
+
+::: callout-tip
+**In this course:** you build skill by typing, running, breaking, and fixing.
+:::
+
+# Day 4: Practical EDA + Plotly + Bootstrap Uncertainty
+
+**Goal:** turn `analytics_table.parquet` into **answers**: 3–6 questions, clear tables, clear charts, and at least one bootstrap interval. 
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+Say: “Today you become dangerous (in a good way): you’ll turn data into conclusions with caveats.”
+Do: show end-state notebook: questions -> charts -> exported PNGs -> short bullets.
+Ask: “What’s the risk of making charts before checking missingness and keys?”
+:::
+
+---
+
+## Today’s Flow
+
+* **Session 1 (60m):** Practical EDA workflow (audit → questions → comparisons)
+* *Asr Prayer (20m)*
+* **Session 2 (60m):** Plotly visualization (chart anatomy + choices + export)
+* *Maghrib Prayer (20m)*
+* **Session 3 (60m):** Bootstrap uncertainty (CIs for differences)
+* *Isha Prayer (20m)*
+* **Hands-on (120m):** Build `notebooks/eda.ipynb` + export figures + bootstrap result
+
+::: {.muted}
+Schedule format per bootcamp standard.
+:::
+
+---
+
+## Learning Objectives
+
+By the end of today, you can: 
+
+* audit a dataset quickly (rows, dtypes, missingness, key sanity)
+* write **3–6 EDA questions** that are measurable and relevant
+* compute descriptive stats (mean/median/percentiles) and **rates** with n’s
+* make clear Plotly charts using one library and consistent labeling
+* export figures to `reports/figures/` (stable filenames)
+* compute a bootstrap CI for a difference in means/rates (with fixed seed)
+
+---
+
+## Warm-up (5 minutes)
+
+Run Day 3 and confirm `analytics_table.parquet` exists.
+
+**macOS/Linux**
+
+```bash
+source .venv/bin/activate
+python scripts/run_day3_build_analytics.py
+python -c "import pandas as pd; df=pd.read_parquet('data/processed/analytics_table.parquet'); print(len(df)); print(df.columns[:10].tolist())"
+```
+
+**Windows PowerShell**
+
+```powershell
+.\\.venv\\Scripts\\Activate.ps1
+python scripts\\run_day3_build_analytics.py
+python -c "import pandas as pd; df=pd.read_parquet('data/processed/analytics_table.parquet'); print(len(df)); print(df.columns[:10].tolist())"
+```
+
+**Checkpoint:** file loads and you can print row count + column names.
+
+---
+
+## If the warm-up breaks (common fixes)
+
+Most common issues:
+
+* `ModuleNotFoundError: bootcamp_data` when running Day 3 scripts (`src/` layout)
+* Parquet load error (missing `pyarrow`)
+* `analytics_table.parquet` not created (Day 3 script didn’t finish)
+
+**Fix 1 (recommended, once): install your project package**
+
+```bash
+pip install -e .
+```
+
+---
+
+**Fix 2 (quick, no install): run scripts with `src/` on your `PYTHONPATH`**
+
+macOS/Linux:
+
+```bash
+PYTHONPATH=src python scripts/run_day3_build_analytics.py
+```
+
+Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH="src"
+python scripts\run_day3_build_analytics.py
+```
+
+**Fix 3: if Parquet won’t load**
+
+```bash
+pip install pyarrow
+```
+
+---
+
+## What we assume is in `analytics_table.parquet`
+
+Minimum columns used today:
+
+* IDs: `order_id`, `user_id`
+* Metrics: `amount`
+* Groups: `country`, `status_clean`
+* Time: `created_at` and/or `month`
+* Helpful (from Day 3): `amount_winsor` (for readable histograms)
+
+--- 
+
+If you’re missing `month` or `amount_winsor`, you can create them **in the notebook**:
+
+```python
+# month (YYYY-MM) from created_at
+if "month" not in df.columns and "created_at" in df.columns:
+    dt = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+    df["month"] = dt.dt.to_period("M").astype("string")
+
+# winsorized amount for charts only (keep raw amount for totals)
+if "amount_winsor" not in df.columns and "amount" in df.columns:
+    lo, hi = df["amount"].quantile([0.01, 0.99])
+    df["amount_winsor"] = df["amount"].clip(lo, hi)
+```
+
+---
+
+
+## Where we are in the weekly workflow
+
+Canonical flow: 
+
+1. Load ✅
+2. Verify ✅
+3. Clean ✅
+4. Transform ✅
+5. Analyze ✅ *(today)*
+6. Visualize ✅ *(today)*
+7. Conclude (Day 5)
+
+---
+
+## EDA output expectations (today)
+
+By end of Day 4, you should have: 
+
+* `notebooks/eda.ipynb` reading **only** from `data/processed/`
+* 3–6 questions answered with:
+
+  * a summary table
+  * 1–2 charts each
+  * 2–4 bullet interpretations + caveats
+* exported charts in `reports/figures/`
+* one bootstrap comparison with CI (seeded)
+
+# Session 1
+
+::: {.muted}
+Practical EDA workflow (audit → questions → comparisons)
+:::
+
+---
+
+## Session 1 objectives
+
+By the end of this session, you can: 
+
+* run a fast dataset audit (the “first 5 minutes”)
+* write EDA questions that lead to decisions (not random charts)
+* use comparison thinking:
+
+  * absolute + relative differences
+  * include sample sizes
+* choose robust summaries for skew (median/percentiles)
+
+---
+
+## Context: EDA is not “make charts until tired”
+
+Good EDA has structure: 
+
+1. audit the data (what do we have?)
+2. write questions (what do we want to learn?)
+3. answer with tables + charts (what do we see?)
+4. add caveats (what could be wrong?)
+5. decide next steps (what do we do next?)
+
+---
+
+## Concept: the “first 5 minutes” audit
+
+Always start with: 
+
+* row count
+* column list
+* dtypes
+* missingness report (top missing columns)
+* key sanity checks (uniqueness, suspicious duplicates)
+
+---
+
+## Example: quick audit checklist (tiny code)
+
+```python
+import pandas as pd
+
+df = pd.read_parquet("data/processed/analytics_table.parquet")
+
+print("rows:", len(df))
+print("cols:", len(df.columns))
+print(df.dtypes.head(10))
+print(df.isna().sum().sort_values(ascending=False).head(10))
+```
+
+---
+
+## Micro-exercise: audit `analytics_table` (7 minutes)
+
+1. Load the Parquet file
+2. Print:
+
+   * row count
+   * first 10 dtypes
+   * top 5 missing columns
+
+**Checkpoint:** you can name the most-missing column and its missing count.
+
+---
+
+## Solution (example) {.smaller}
+
+```python
+import pandas as pd
+
+df = pd.read_parquet("data/processed/analytics_table.parquet")
+
+print("rows:", len(df))
+print(df.dtypes.head(10))
+print(df.isna().sum().sort_values(ascending=False).head(5))
+```
+
+---
+
+## Quick Check
+
+**Question:** Why do we audit missingness before making charts?
+
+. . .
+
+**Answer:** missingness can bias comparisons and create misleading patterns if ignored. 
+
+---
+
+## Concept: EDA questions must be measurable
+
+Bad question:
+
+* “What’s interesting?”
+
+Good questions:
+
+* “How does revenue differ by country?”
+* “Is refund rate higher in one segment?”
+* “How is revenue trending over time?” 
+
+---
+
+## Template: good EDA questions
+
+A good question includes:
+
+* metric (what are we measuring?)
+* slice/group (by what?)
+* time window (optional but helpful)
+* comparison baseline (optional but helpful)
+
+Example:
+
+* “Refund rate by country (with n orders per country).”
+
+---
+
+## Micro-exercise: write 4 questions (6 minutes)
+
+Write **4 EDA questions** for `analytics_table`.
+
+You must include:
+
+* 1 trend question (time)
+* 1 segment question (country/status)
+* 1 distribution question (amount)
+* 1 “data quality” question (missingness/outliers)
+
+**Checkpoint:** 4 questions, each one sentence.
+
+---
+
+## Solution: examples of strong questions
+
+Examples (adapt to your dataset): 
+
+* Trend: “How does total revenue change by month?”
+* Segment: “Is refund rate different by country (with n)?”
+* Distribution: “What is the distribution of order amount (winsorized)?”
+* Data quality: “How often is `created_at` missing after parsing, and is it concentrated in one country?”
+
+---
+
+## Concept: comparison thinking (don’t just report a number)
+
+When comparing groups, report: 
+
+* absolute difference (e.g., +$2.10)
+* relative difference (e.g., +8%)
+* sample sizes (n)
+* uncertainty (today: bootstrap CI)
+
+---
+
+## Example: a comparison table shape
+
+A helpful comparison table includes:
+
+* group
+* n
+* mean
+* median
+* p90 (optional)
+
+This prevents “average hides skew.” 
+
+---
+
+## Micro-exercise: write what you will report (3 minutes)
+
+Pick one question you wrote.
+
+Write a “definition block”:
+
+* metric:
+* group:
+* filters:
+* time window:
+
+**Checkpoint:** all 4 fields filled.
+
+---
+
+## Solution: definition block example
+
+* metric: refund rate (`is_refund` mean)
+* group: country
+* filters: all orders with non-missing `status_clean`
+* time window: full dataset (later: by month)
+
+---
+
+## Concept: robust numeric summaries
+
+Default numeric summaries for EDA: 
+
+* n (non-missing)
+* mean (for totals/ratios)
+* median (typical)
+* p25 / p75 (spread)
+* p90 / p99 (tail)
+
+---
+
+## Example: `describe_numeric(df, col)` 
+
+```python
+import pandas as pd
+
+def describe_numeric(df: pd.DataFrame, col: str) -> pd.Series:
+    s = pd.to_numeric(df[col], errors="coerce")
+    return pd.Series({
+        "n": s.notna().sum(),
+        "mean": s.mean(),
+        "median": s.median(),
+        "p25": s.quantile(0.25),
+        "p75": s.quantile(0.75),
+        "p90": s.quantile(0.90),
+        "min": s.min(),
+        "max": s.max(),
+    })
+```
+
+---
+
+## Micro-exercise: summarize `amount` (6 minutes)
+
+Run `describe_numeric(df, "amount")`.
+
+**Checkpoint:** you can explain the difference between mean and median in your data.
+
+---
+
+## Solution (example)
+
+```python
+print(describe_numeric(df, "amount"))
+```
+
+---
+
+## Quick Check
+
+**Question:** If mean is much larger than median, what does that suggest?
+
+. . .
+
+**Answer:** a skewed distribution / heavy tail (outliers matter). 
+
+---
+
+## Concept: rates must include numerator + denominator
+
+A refund rate without `n` is suspicious. 
+
+Always compute:
+
+* `refunds` (numerator)
+* `total` (denominator)
+* `refund_rate = refunds / total`
+
+---
+
+## Example: refund rate by country (pattern) 
+
+```python
+rate = (
+    df.assign(is_refund=df["status_clean"].eq("refund"))
+      .groupby("country", dropna=False)
+      .agg(refunds=("is_refund","sum"), total=("is_refund","size"))
+      .assign(refund_rate=lambda t: t["refunds"] / t["total"])
+      .reset_index()
+      .sort_values("refund_rate", ascending=False)
+)
+```
+
+---
+
+## Micro-exercise: compute refund rate table (7 minutes)
+
+Compute refund rate by country.
+
+**Checkpoint:** you can see `refunds`, `total`, and `refund_rate` columns.
+
+---
+
+## Solution (example)
+
+```python
+rate = (
+    df.assign(is_refund=df["status_clean"].eq("refund"))
+      .groupby("country", dropna=False)
+      .agg(refunds=("is_refund","sum"), total=("is_refund","size"))
+      .assign(refund_rate=lambda t: t["refunds"] / t["total"])
+      .reset_index()
+)
+print(rate)
+```
+
+---
+
+## Checkpoint
+
+Raise your hand when:
+
+* you can run a quick audit (rows/dtypes/missingness)
+* you wrote at least 4 good EDA questions
+* you computed at least one comparison table (with n)
+
+::: {.notes}
+Walk around, spot-check 3 students, fix 1 common issue on projector.
+:::
+
+---
+
+## Session 1 recap
+
+* EDA is a workflow: audit → questions → comparisons → caveats 
+* Ask measurable questions (metric + group + filters)
+* Compare with absolute/relative differences and sample sizes
+* Use robust summaries for skew (median/percentiles)
+
+# Asr break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll turn tables into clear Plotly charts and export figures.
+
+# Session 2
+
+::: {.muted}
+Plotly visualization (chart anatomy + choices + export)
+:::
+
+---
+
+## Session 2 objectives
+
+By the end of this session, you can: 
+
+* name the parts of a chart (figure, axes, marks, scales, labels)
+* choose the simplest chart that answers the question
+* build Plotly Express charts and improve them with `update_*`
+* export figures to `reports/figures/` (Kaleido)
+
+---
+
+## Context: charts are a communication tool
+
+A good chart answers one question:
+
+* quickly
+* clearly
+* with correct context (units, time window, n)
+
+A bad chart can mislead even if the code is correct. 
+
+---
+
+## Concept: universal chart anatomy
+
+Every chart has: 
+
+* **figure** (container)
+* **axes** (x/y)
+* **marks/traces** (bars/lines/points)
+* **scales** (linear/log, category order)
+* **legend** (mapping)
+* **labels/titles**
+* optional annotations / facets
+
+---
+
+## Micro-exercise: “find the missing label” (3 minutes)
+
+You see a bar chart with:
+
+* no y-axis label
+* title: “Revenue”
+
+What’s missing?
+
+**Checkpoint:** name 2 missing pieces.
+
+---
+
+## Solution: “find the missing label”
+
+Missing:
+
+* time window (“Revenue in what period?”)
+* units/currency (“Revenue in SAR? USD?”)
+* sometimes sample size (n orders/users)
+
+---
+
+## Concept: chart choice guidance
+
+Choose simplest chart that answers the question: 
+
+* compare categories → bar (sorted) or dot
+* trend over time → line
+* distribution → histogram (or box/violin sparingly)
+* relationship (2 numeric) → scatter
+* composition → stacked bars (use carefully)
+
+---
+
+## Micro-exercise: chart choice (5 minutes)
+
+Pick the best chart:
+
+1. “Revenue by country”
+2. “Revenue over time (by month)”
+3. “Distribution of amount_winsor”
+4. “Refund rate by country”
+
+**Checkpoint:** name one chart type for each.
+
+---
+
+## Solution: chart choice
+
+1. bar (sorted)
+2. line
+3. histogram
+4. bar (sorted)
+
+(Keep it simple.) 
+
+---
+
+## Concept: Plotly Express + small improvements
+
+Default pattern: 
+
+* `px.bar / px.line / px.histogram`
+* then `fig.update_layout(...)` and `fig.update_xaxes/yaxes(...)`
+
+Avoid mixing libraries (one library per project). 
+
+---
+
+## Example: a sorted bar chart (revenue by country)
+
+```python
+import plotly.express as px
+
+d = revenue_by_country.sort_values("revenue", ascending=False)
+fig = px.bar(d, x="country", y="revenue", title="Revenue by country (All time)")
+fig.update_layout(title={"x": 0.02}, margin={"l": 60, "r": 20, "t": 60, "b": 60})
+fig.update_xaxes(title_text="Country")
+fig.update_yaxes(title_text="Revenue")
+fig
+```
+
+---
+
+## Micro-exercise: build your first Plotly chart (7 minutes)
+
+Build “Revenue by country”:
+
+1. compute the table (`n`, `revenue`)
+2. sort by revenue descending
+3. plot bar chart with good labels
+
+**Checkpoint:** your chart has:
+
+* title with time window
+* labeled axes
+
+---
+
+## Solution (example) {.smaller}
+
+```python
+import plotly.express as px
+
+rev = (
+    df.groupby("country", dropna=False)
+      .agg(n=("order_id","size"), revenue=("amount","sum"))
+      .reset_index()
+      .sort_values("revenue", ascending=False)
+)
+
+fig = px.bar(rev, x="country", y="revenue", title="Revenue by country (all data)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Country")
+fig.update_yaxes(title_text="Revenue (amount sum)")
+fig
+```
+
+---
+
+## Concept: trends need time aggregation first
+
+Don’t plot one point per raw row for trends.
+
+Instead:
+
+* group by date/month
+* sum revenue
+* then plot line chart
+
+This reduces noise and improves readability. 
+
+---
+
+## Example: revenue by month → line
+
+```python
+trend = (
+    df.groupby("month", dropna=False)
+      .agg(revenue=("amount","sum"), n=("order_id","size"))
+      .reset_index()
+      .sort_values("month")
+)
+
+fig = px.line(trend, x="month", y="revenue", title="Revenue over time (by month)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Month")
+fig.update_yaxes(title_text="Revenue")
+fig
+```
+
+---
+
+## Micro-exercise: make a trend chart (8 minutes)
+
+Make a line chart:
+
+* revenue by month
+* sorted by month
+* label axes
+
+**Checkpoint:** your x-axis is ordered by time (not random category order).
+
+---
+
+## Solution (example)
+
+```python
+import plotly.express as px
+
+trend = (
+    df.groupby("month", dropna=False)
+      .agg(revenue=("amount","sum"), n=("order_id","size"))
+      .reset_index()
+      .sort_values("month")
+)
+
+fig = px.line(trend, x="month", y="revenue", title="Revenue over time (monthly)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Month")
+fig.update_yaxes(title_text="Revenue")
+fig
+```
+
+---
+
+## Concept: distribution chart (use winsorized amounts)
+
+For amounts, prefer `amount_winsor` (capped) for charts, keep raw for totals. 
+
+This makes the histogram readable without deleting rows.
+
+---
+
+## Example: histogram of `amount_winsor`
+
+```python
+fig = px.histogram(df, x="amount_winsor", nbins=30, title="Order amount distribution (winsorized)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Amount (winsorized)")
+fig.update_yaxes(title_text="Count of orders")
+fig
+```
+
+---
+
+## Micro-exercise: histogram (6 minutes)
+
+Make a histogram of `amount_winsor`.
+
+**Checkpoint:** chart has title + labeled axes.
+
+---
+
+## Solution (example)
+
+```python
+import plotly.express as px
+
+fig = px.histogram(df, x="amount_winsor", nbins=30, title="Amount distribution (winsorized)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Amount (winsorized)")
+fig.update_yaxes(title_text="Number of orders")
+fig
+```
+
+---
+
+## Concept: exporting figures (Kaleido)
+
+To export Plotly images, you typically need **Kaleido**. 
+
+Install once:
+
+**macOS/Linux**
+
+```bash
+pip install kaleido
+```
+
+**Windows PowerShell**
+
+```powershell
+pip install kaleido
+```
+
+---
+
+## Example: `save_fig(fig, path)` helper 
+
+```python
+from pathlib import Path
+
+def save_fig(fig, path: Path, *, scale: int = 2) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.write_image(str(path), scale=scale)  # needs kaleido
+```
+
+---
+
+## Micro-exercise: export one figure (6 minutes)
+
+Export your “Revenue by country” chart to:
+
+* `reports/figures/revenue_by_country.png`
+
+**Checkpoint:** the PNG file exists on disk.
+
+---
+
+## Solution (example)
+
+```python
+from pathlib import Path
+
+save_fig(fig, Path("reports/figures/revenue_by_country.png"))
+```
+
+---
+
+## Quick Check
+
+**Question:** Why export figures instead of leaving them only inside the notebook?
+
+. . .
+
+**Answer:** exports make your findings shareable (slides, reports) and reproducible. 
+
+---
+
+## Checkpoint
+
+Raise your hand when:
+
+* you made 1 Plotly bar chart
+* you made 1 Plotly line chart
+* you exported at least 1 PNG
+
+::: {.notes}
+Spot-check exports: are titles readable? are axes labeled? stable filenames?
+:::
+
+---
+
+## Session 2 recap
+
+* Charts have anatomy: labels matter as much as code 
+* Use the simplest chart for the question
+* Plotly Express + `update_*` makes clean charts fast
+* Export figures to `reports/figures/` (Kaleido)
+
+# Maghrib break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll quantify uncertainty using bootstrap intervals.
+
+# Session 3
+
+::: {.muted}
+Bootstrap uncertainty (CIs for differences)
+:::
+
+---
+
+## Session 3 objectives
+
+By the end of this session, you can: 
+
+* explain what a bootstrap interval answers (in practical terms)
+* compute a bootstrap CI for a difference in means or rates
+* set a random seed for reproducibility
+* interpret a CI (what it means and what it doesn’t mean)
+
+---
+
+## Context: “How sure are we?”
+
+Two groups can look different by chance.
+
+Bootstrap helps answer:
+
+* “How variable is this estimate?”
+* “Could this difference be noise?”
+
+Without heavy theory. 
+
+---
+
+## Concept: what bootstrap does
+
+Bootstrap:
+
+* resamples your observed data *with replacement*
+* recomputes the statistic many times
+* uses the distribution to get a CI
+
+It’s simulation-based uncertainty. 
+
+---
+
+## Quick Check
+
+**Question:** What is the main assumption behind bootstrap?
+
+. . .
+
+**Answer:** your sample is reasonably representative of the population you care about. 
+
+---
+
+## When to use bootstrap (practical)
+
+Use bootstrap when: 
+
+* comparing means/medians/rates between groups
+* you want a rough CI without strong distribution assumptions
+* you can’t (or don’t want to) rely on a textbook formula
+
+---
+
+## Pitfalls (practical)
+
+Bootstrap can mislead if: 
+
+* group sizes are tiny
+* data points aren’t independent (time series, repeated measures)
+* you do many comparisons and “shop” for significance
+
+---
+
+## Example: bootstrap difference in means/rates
+
+```python
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+def bootstrap_diff_means(
+    a: pd.Series,
+    b: pd.Series,
+    *,
+    n_boot: int = 2000,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Bootstrap CI for the difference in means (A - B).
+
+    For rates, pass a 0/1 Series (e.g., `is_refund.astype(int)`).
+    """
+    rng = np.random.default_rng(seed)
+    a = pd.to_numeric(a, errors="coerce").dropna().to_numpy()
+    b = pd.to_numeric(b, errors="coerce").dropna().to_numpy()
+    assert len(a) > 0 and len(b) > 0, "Empty group after cleaning"
+
+    diffs = []
+    for _ in range(n_boot):
+        sa = rng.choice(a, size=len(a), replace=True)
+        sb = rng.choice(b, size=len(b), replace=True)
+        diffs.append(sa.mean() - sb.mean())
+    diffs = np.array(diffs)
+
+    return {
+        "diff_mean": float(a.mean() - b.mean()),
+        "ci_low": float(np.quantile(diffs, 0.025)),
+        "ci_high": float(np.quantile(diffs, 0.975)),
+    }
+```
+
+---
+
+## Micro-exercise: choose a bootstrap question (4 minutes)
+
+Pick one:
+
+A) Difference in mean amount between two countries
+B) Difference in refund rate between two countries
+C) Difference in mean amount between paid vs refund
+
+**Checkpoint:** write which two groups you’ll compare.
+
+---
+
+## Solution: good bootstrap comparisons
+
+Examples:
+
+* SA vs AE (mean amount)
+* SA vs AE (refund rate via `is_refund`)
+* paid vs refund (mean amount)
+
+Best choice depends on having enough rows in each group.
+
+---
+
+## How to bootstrap a rate
+
+A rate is the mean of a 0/1 variable.
+
+Example:
+
+* `is_refund = (status_clean == "refund")`
+* mean of `is_refund` = refund rate
+
+Then `bootstrap_diff_means` works. 
+
+---
+
+## Micro-exercise: build `is_refund` and split groups (7 minutes)
+
+1. Create `is_refund`
+2. Pick two groups (e.g., `country == "SA"` vs `country == "AE"`)
+3. Extract `a` and `b` series (the `is_refund` column)
+
+**Checkpoint:** you can print `len(a)` and `len(b)`.
+
+---
+
+## Solution (example) {.smaller}
+
+```python
+d = df.assign(is_refund=df["status_clean"].eq("refund"))
+
+a = d.loc[d["country"].eq("SA"), "is_refund"].astype(int)
+b = d.loc[d["country"].eq("AE"), "is_refund"].astype(int)
+
+print("n_SA:", len(a), "n_AE:", len(b))
+```
+
+---
+
+## Micro-exercise: run bootstrap CI (7 minutes)
+
+Run:
+
+* `bootstrap_diff_means(a, b, n_boot=2000, seed=0)`
+
+**Checkpoint:** you get a dict with `diff_mean`, `ci_low`, `ci_high`.
+
+---
+
+## Solution (example)
+
+```python
+res = bootstrap_diff_means(a, b, n_boot=2000, seed=0)
+print(res)
+```
+
+---
+
+## How to interpret the CI (operational)
+
+If CI is:
+
+* entirely above 0 → group A likely higher than group B (in your sample)
+* overlaps 0 → difference could be small or noisy
+
+Always include:
+
+* absolute diff
+* relative diff (optional)
+* sample sizes (n) 
+
+---
+
+## Micro-exercise: write the interpretation (4 minutes)
+
+Write 2 bullets:
+
+* what is the estimated difference?
+* what does the CI suggest?
+
+**Checkpoint:** 2 bullets, plain English.
+
+---
+
+## Solution: example interpretation
+
+* “Estimated refund rate difference (SA − AE) is +0.03.”
+* “95% bootstrap CI is [−0.01, +0.07], so the difference may be small / uncertain.”
+
+(Also report n’s.)
+
+---
+
+## Quick Check
+
+**Question:** Does a bootstrap CI prove causation?
+
+. . .
+
+**Answer:** no — it only quantifies uncertainty in the observed difference. 
+
+---
+
+## Session 3 recap
+
+* Bootstrap gives simulation-based uncertainty intervals 
+* Rates can be bootstrapped via 0/1 means
+* Fix a random seed for reproducibility
+* Interpret CI with effect size + n + caveats
+
+# Isha break {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+## 20 minutes
+
+**When you return:** we’ll build your EDA notebook and export figures like a real analytics handoff.
+
+# Hands-on
+
+::: {.muted}
+Build: `notebooks/eda.ipynb` + exported figures + bootstrap result
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+By the end, you should have: 
+
+* `notebooks/eda.ipynb` reading only from `data/processed/analytics_table.parquet`
+* 3–6 answered questions with:
+
+  * a summary table
+  * a chart
+  * bullet interpretations + caveats
+* **3+ exported figures** in `reports/figures/`
+* 1 bootstrap CI result (in notebook)
+
+---
+
+## Project layout (Day 4 focus)
+
+```text
+notebooks/
+  eda.ipynb
+reports/
+  figures/
+    revenue_by_country.png
+    revenue_trend_monthly.png
+    amount_hist_winsor.png
+data/processed/
+  analytics_table.parquet
+```
+
+::: {.muted}
+Notebooks should read processed outputs, not raw.
+:::
+
+---
+
+## Task 1 — Create the EDA notebook skeleton (10 minutes)
+
+Create `notebooks/eda.ipynb` with sections:
+
+1. Setup + imports
+2. Load processed data
+3. Quick audit
+4. Questions + results
+5. Bootstrap comparison
+6. Findings + caveats
+
+**Checkpoint:** notebook runs top-to-bottom without errors (even if empty results).
+
+---
+
+## Solution — starter imports (paste into first cell)
+
+```python
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+
+DATA = Path("data/processed/analytics_table.parquet")
+FIGS = Path("reports/figures")
+FIGS.mkdir(parents=True, exist_ok=True)
+
+def save_fig(fig, path: Path, *, scale: int = 2) -> None:
+    """Save a Plotly figure to disk (requires `kaleido`)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.write_image(str(path), scale=scale)
+```
+
+---
+
+## Task 2 — Load + audit (15 minutes)
+
+In your notebook:
+
+* load `analytics_table.parquet`
+* print:
+
+  * row count
+  * dtypes (first 15)
+  * top missing columns
+
+**Checkpoint:** you can write 2 bullets describing the dataset quality.
+
+---
+
+## Solution — load + audit (example)
+
+```python
+df = pd.read_parquet(DATA)
+
+print("rows:", len(df), "cols:", len(df.columns))
+print(df.dtypes.head(15))
+
+missing = df.isna().sum().sort_values(ascending=False).head(10)
+print(missing)
+```
+
+---
+
+## Task 3 — Define your EDA questions (10 minutes)
+
+Write **3–6 questions** at the top of the notebook.
+
+Rule: each question must map to:
+
+* a table
+* a chart
+* 2–4 bullets
+
+**Checkpoint:** questions are written as measurable sentences.
+
+---
+
+## Solution — question list template
+
+```markdown
+### Questions
+
+1. ...
+2. ...
+3. ...
+4. ...
+```
+
+---
+
+## Task 4 — Question 1: Revenue by country (20 minutes)
+
+Build:
+
+* table: `n`, `revenue`, `aov`
+* chart: sorted bar
+* bullets: 2–4 interpretations + 1 caveat
+
+Export chart to `reports/figures/revenue_by_country.png`.
+
+**Checkpoint:** PNG exists and opens.
+
+---
+
+## Solution — revenue by country (example) {.smaller}
+
+```python
+rev = (
+    df.groupby("country", dropna=False)
+      .agg(
+          n=("order_id","size"),
+          revenue=("amount","sum"),
+          aov=("amount","mean"),
+      )
+      .reset_index()
+      .sort_values("revenue", ascending=False)
+)
+
+fig = px.bar(rev, x="country", y="revenue", title="Revenue by country (all data)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Country")
+fig.update_yaxes(title_text="Revenue (sum of amount)")
+save_fig(fig, FIGS / "revenue_by_country.png")
+fig
+```
+
+---
+
+## Task 5 — Question 2: Revenue trend (monthly) (20 minutes)
+
+Build:
+
+* table: `month`, `n`, `revenue`
+* chart: line
+* bullets: 2–4 interpretations + 1 caveat
+
+Export to `reports/figures/revenue_trend_monthly.png`.
+
+**Checkpoint:** x-axis is in time order.
+
+---
+
+## Solution — trend chart (example)
+
+```python
+trend = (
+    df.groupby("month", dropna=False)
+      .agg(n=("order_id","size"), revenue=("amount","sum"))
+      .reset_index()
+      .sort_values("month")
+)
+
+fig = px.line(trend, x="month", y="revenue", title="Revenue over time (monthly)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Month")
+fig.update_yaxes(title_text="Revenue")
+save_fig(fig, FIGS / "revenue_trend_monthly.png")
+fig
+```
+
+---
+
+## Task 6 — Question 3: Amount distribution (winsorized) (15 minutes)
+
+Build:
+
+* chart: histogram of `amount_winsor`
+* bullet: what “typical” looks like + mention skew/outliers
+
+Export to `reports/figures/amount_hist_winsor.png`.
+
+**Checkpoint:** histogram renders and exports.
+
+---
+
+## Solution — histogram (example)
+
+```python
+fig = px.histogram(df, x="amount_winsor", nbins=30, title="Order amount distribution (winsorized)")
+fig.update_layout(title={"x": 0.02})
+fig.update_xaxes(title_text="Amount (winsorized)")
+fig.update_yaxes(title_text="Number of orders")
+save_fig(fig, FIGS / "amount_hist_winsor.png")
+fig
+```
+
+---
+
+## Task 7 — Bootstrap comparison (25 minutes)
+
+Choose a comparison:
+
+* mean amount between 2 groups, OR
+* refund rate between 2 groups (0/1 mean)
+
+Compute:
+
+* `diff_mean`
+* `ci_low`, `ci_high`
+* report sample sizes
+
+**Checkpoint:** your notebook prints a CI and you interpret it in 2 bullets.
+
+---
+
+## Solution — bootstrap diff means (copy into notebook) {.smaller}
+
+```python
+def bootstrap_diff_means(a: pd.Series, b: pd.Series, *, n_boot: int = 2000, seed: int = 0) -> dict:
+    rng = np.random.default_rng(seed)
+    a = pd.to_numeric(a, errors="coerce").dropna().to_numpy()
+    b = pd.to_numeric(b, errors="coerce").dropna().to_numpy()
+    assert len(a) > 0 and len(b) > 0, "Empty group after cleaning"
+
+    diffs = []
+    for _ in range(n_boot):
+        sa = rng.choice(a, size=len(a), replace=True)
+        sb = rng.choice(b, size=len(b), replace=True)
+        diffs.append(sa.mean() - sb.mean())
+    diffs = np.array(diffs)
+
+    return {
+        "diff_mean": float(a.mean() - b.mean()),
+        "ci_low": float(np.quantile(diffs, 0.025)),
+        "ci_high": float(np.quantile(diffs, 0.975)),
+    }
+
+d = df.assign(is_refund=df["status_clean"].eq("refund").astype(int))
+
+a = d.loc[d["country"].eq("SA"), "is_refund"]
+b = d.loc[d["country"].eq("AE"), "is_refund"]
+
+print("n_SA:", len(a), "n_AE:", len(b))
+res = bootstrap_diff_means(a, b, n_boot=2000, seed=0)
+print(res)
+```
+
+---
+
+## Task 8 — Git checkpoint (5 minutes)
+
+Commit your progress:
+
+* notebook created
+* figures exported
+
+Suggested message:
+
+* `"w2d4: eda notebook + exported figures + bootstrap"`
+
+**Checkpoint:** you can see your commit on GitHub.
+
+---
+
+## Solution — git commands
+
+```bash
+git add -A
+git commit -m "w2d4: eda notebook + exported figures + bootstrap"
+git push
+```
+
+---
+
+## Debug playbook (Day 4 edition)
+
+If your EDA looks wrong:
+
+1. Confirm you loaded from `data/processed/` (not raw) 
+2. Print dtypes (IDs as strings, datetimes parsed)
+3. Check missingness for key columns (country/status/amount)
+4. For trends: confirm month sorting
+5. For exports: install kaleido and re-run export cell
+
+---
+
+## Stretch goals (optional)
+
+If you finish early:
+
+* Add a facet chart (e.g., histogram by country)
+* Create a small “data dictionary” cell listing key columns + meaning
+* Add one more comparison question with a second bootstrap CI
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+**What is one conclusion you can make from your charts, and what is one caveat?** 
+
+---
+
+## What to do after class (Day 4 assignment)
+
+**Due:** before Day 5 starts
+
+1. Finish `notebooks/eda.ipynb` with **3–6 questions**
+2. Export **at least 3 figures** to `reports/figures/`
+3. Include **one bootstrap CI** comparison
+4. Push to GitHub
+
+**Deliverable:** GitHub repo link + screenshot of `reports/figures/` folder showing your exported images.
+
+::: callout-tip
+Tomorrow you’ll write the final summary + package the project like a real handoff.
+:::
+
+# Thank You! {background-image='{{< brand logo anim >}}' background-opacity='0.1'}
+
+<div style="width: 300px">{{< brand logo full >}}</div>
