@@ -1,0 +1,778 @@
+---
+pagetitle: "W3 D2"
+date: 2025-12-29
+---
+
+## Announcements / admin
+
+- Today you create your first **reproducible training run** (baseline + saved model)
+- Don’t commit generated artifacts:
+  - `models/runs/`, `data/processed/`, `outputs/` are gitignored on purpose
+- Keep your `reports/model_card.md` open (we will update the evaluation plan section)
+
+::: callout-note
+If you get stuck: read the error, then ask for clarification — not code.
+:::
+
+# Day 2: Split + baseline + train
+
+**Goal:** run `ml-baseline train` to create a versioned run folder and save baseline metrics + a trained model.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** “Yesterday we defined the data contract. Today we prove we can evaluate on unseen data.”
+**Do:** show the `models/runs/` folder after one training run.
+:::
+
+---
+
+## Today’s Flow {.smaller}
+
+- **Session 1 (60m):** Splits that don’t lie (holdout + stratify)
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Baselines + metrics (beat the dummy)
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** `train` command anatomy (run_id + artifacts)
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Run training, inspect artifacts, update model card, push a commit
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+- Explain what a **holdout split** is (and why it exists)
+- Choose a split strategy at a high level: **random / time / group**
+- Explain why a **Dummy baseline** is mandatory
+- Identify an evaluation metric that matches a decision (precision/recall vs accuracy)
+- Run `uv run ml-baseline train --target ...` and find saved artifacts
+- Update your model card with a clear **evaluation plan**
+
+---
+
+## Warm-up (5 minutes)
+
+Run yesterday’s work and confirm it still works.
+
+```bash
+uv run ml-baseline --help
+uv run ml-baseline make-sample-data
+ls data/processed
+uv run pytest
+```
+
+**Checkpoint:** you see `features.csv` **or** `features.parquet`, and tests pass.
+
+---
+
+## From your model card → your training config
+
+Yesterday you wrote a **dataset contract**:
+
+- **Target (y):** what you predict
+- **Unit of analysis:** what one row represents
+- **ID passthrough:** how you join predictions back
+- **Forbidden columns:** target + obvious leakage
+
+::: callout-tip
+Today you will *use* those decisions to split and train consistently.
+:::
+
+---
+
+## Where today fits in the Week 3 loop
+
+```text
+Define → Split → Baseline → Train → Save → Predict → Report
+```
+
+::: {.muted}
+Today: **Split + Baseline + Train (your first run folder)**.
+Tomorrow: we’ll go deeper on evaluation artifacts and the input schema.
+:::
+
+---
+
+## End-of-day demo (what should work)
+
+**Train**
+```bash
+uv run ml-baseline train --target is_high_value
+```
+
+**What should happen**
+- a new folder appears in `models/runs/<run_id>/`
+- `models/registry/latest.txt` updates to the newest run
+- baseline metrics are saved to the run folder
+
+# Session 1
+
+::: {.muted}
+Splits that don’t lie (holdout + stratify)
+:::
+
+---
+
+## Session 1 objectives
+
+- Understand splitting as a **simulation of production**
+- Know when random split is acceptable (minimum requirement)
+- Understand stratification for binary classification
+
+---
+
+## Why do we split?
+
+A split answers:
+
+> “If we train on some rows, how well do we do on **new rows**?”
+
+Without a split, you only know:
+
+- “how well do we predict what we already saw?” (not useful)
+
+---
+
+## Train vs holdout (final exam)
+
+- **Train split:** the model learns patterns
+- **Holdout split:** the model takes a “final exam” on unseen data
+
+::: callout-tip
+Treat the holdout set like production: don’t “study” it.
+:::
+
+---
+
+## Random split (minimum requirement)
+
+Random split is OK when:
+
+- each row is mostly independent
+- you are not forecasting over time
+- you do not have repeated entities (or you already have 1 row per entity)
+
+::: {.muted}
+Our sample dataset has 1 row per `user_id`, so random split is fine.
+:::
+
+---
+
+## Stratification (keep class balance)
+
+If your target is imbalanced (example: 5% positives):
+
+- plain random split can create **weird** class balance by accident
+- stratification keeps train/holdout positive rates similar
+
+::: callout-note
+Stratify only makes sense for classification (not regression).
+:::
+
+---
+
+## Micro-exercise: choose the split (6 minutes)
+
+Pick the best split strategy:
+
+1) Predict next month demand using last 24 months of data  
+2) Predict fraud on transactions (each user has many rows)  
+3) Predict churn where each user appears once (one row per user)
+
+**Checkpoint:** you can justify each choice in 1 sentence.
+
+---
+
+## Solution: choose the split
+
+1) **Time split** (future demand = time matters)  
+2) **Group split** (avoid user leakage across splits)  
+3) **Random split** (likely i.i.d. and one row per user)
+
+---
+
+## Group leakage (common “accidental cheating”)
+
+If the same entity appears in train and holdout:
+
+- the model can “recognize” the entity
+- metrics inflate without real learning
+
+Typical group columns:
+- `user_id`, `customer_id`, `device_id`, `patient_id`
+
+---
+
+## Code pattern: random stratified split {.smaller}
+
+```python {code-line-numbers="1-3|4-5|6-8|9|"}
+from sklearn.model_selection import train_test_split
+
+def random_split(df, *, target, test_size, seed, stratify):
+    y = df[target]
+    strat = y if stratify else None
+    train, test = train_test_split(
+        df, test_size=test_size, random_state=seed, stratify=strat
+    )
+    return train.reset_index(drop=True), test.reset_index(drop=True)
+```
+
+::: {.muted}
+Minimum requirement: stratify for **binary** classification when possible.
+:::
+
+---
+
+## Quick Check
+
+**Question:** What problem does stratification prevent?
+
+. . .
+
+**Answer:** train and holdout accidentally having very different class balance.
+
+---
+
+## Session 1 recap
+
+- Splitting simulates “new data”
+- Holdout is a final exam
+- Random stratified split is the minimum for binary classification
+
+# Asr break {.splash}
+
+## 20 minutes
+
+**When you return:** be ready to explain why “beat the dummy” is required.
+
+# Session 2
+
+::: {.muted}
+Baselines + metrics (beat the dummy)
+:::
+
+---
+
+## Session 2 objectives
+
+- Define a baseline as a **floor**
+- See why accuracy can lie (imbalanced targets)
+- Pick a primary metric that matches a decision
+
+---
+
+## What is a baseline?
+
+A baseline is the simplest thing that could work:
+
+- classification: predict the most common class
+- regression: predict the average target value
+
+::: callout-tip
+If your model can’t beat the baseline, something is wrong (or there is no signal).
+:::
+
+---
+
+## If you can’t beat the dummy…
+
+That usually means one of these:
+
+- your features don’t contain signal
+- your target is noisy or poorly defined
+- your split is unrealistic (leakage or mismatch)
+
+::: {.muted}
+A baseline result is a diagnostic, not an insult.
+:::
+
+---
+
+## Metrics are about the decision
+
+Before you choose a metric, ask:
+
+- which mistake is worse?
+  - **false positives** (predict “yes” when it’s “no”)
+  - **false negatives** (miss a real “yes”)
+- do you need a ranking score or a hard decision?
+
+::: callout-note
+Today we focus on decision metrics: accuracy / precision / recall / F1.
+:::
+
+---
+
+## Accuracy trap (imbalanced data)
+
+Suppose:
+
+- 1000 samples
+- 50 positives (5%)
+- a model predicts “negative” for everyone
+
+What is accuracy?
+
+---
+
+## Micro-exercise: compute the accuracy (3 minutes)
+
+1. Correct negatives = ?
+2. Total samples = ?
+3. Accuracy = ?
+
+**Checkpoint:** you have a number between 0 and 1.
+
+---
+
+## Solution: why accuracy can lie
+
+- Correct negatives = 950  
+- Total = 1000  
+- Accuracy = 950 / 1000 = **0.95**
+
+::: callout-warning
+95% accuracy can still mean “your model never finds positives.”
+:::
+
+---
+
+## Minimum metrics (what we report this week)
+
+**Classification (binary)**
+- accuracy
+- precision
+- recall
+- F1
+
+**Regression**
+- MAE (Mean Absolute Error)
+
+::: callout-tip
+Pick one primary metric and write it in your model card today.
+:::
+
+---
+
+## Optional metrics (if you finish early)
+
+- ROC AUC / PR AUC: useful when you care about ranking quality
+- RMSE: penalizes large errors more than MAE
+- R²: “how much variance explained” (often confusing for beginners)
+
+::: {.muted}
+Optional ≠ unimportant. It’s just not required to ship a baseline this week.
+:::
+
+---
+
+## Dummy baseline in scikit-learn (pattern) {.smaller}
+
+```python {code-line-numbers="1|3-4|6-7|8|"}
+from sklearn.dummy import DummyClassifier
+
+dummy = DummyClassifier(strategy="most_frequent")
+dummy.fit(X_train, y_train)
+
+proba = dummy.predict_proba(X_test)
+y_score = proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
+baseline = classification_metrics(y_true, y_score, threshold=0.5)
+```
+
+::: {.muted}
+Fit on the train split, evaluate on the holdout split.
+:::
+
+---
+
+## Micro-exercise: interpret a baseline (5 minutes)
+
+You see:
+
+- baseline accuracy = 0.95
+- baseline recall = 0.00
+
+1. What is the baseline doing?
+2. Why is this baseline “good” and “bad” at the same time?
+3. Which metric should you focus on next?
+
+**Checkpoint:** you can answer in 3 short sentences.
+
+---
+
+## Solution: interpret the baseline
+
+1. It predicts the majority class (“negative”) almost always.
+2. Accuracy looks great because positives are rare, but it never finds positives.
+3. Focus on recall/precision/F1 (or change the problem/threshold).
+
+---
+
+## Session 2 recap
+
+- Baselines create a performance floor
+- Accuracy can be misleading on imbalanced targets
+- Choose a metric that matches your decision
+
+# Maghrib break {.splash}
+
+## 20 minutes
+
+**When you return:** we will connect the concepts to the `train` command + artifacts.
+
+# Session 3
+
+::: {.muted}
+`train` command anatomy (run_id + artifacts)
+:::
+
+---
+
+## Session 3 objectives
+
+- Understand what `ml-baseline train` does at a high level
+- Know what a run folder is and why it exists
+- Identify the minimum artifacts you need today
+
+---
+
+## What `ml-baseline train` does (in 8 steps) {.smaller}
+
+1. Load `data/processed/features.*`
+2. Separate **X** and **y** (drop target + IDs from X)
+3. Split into train + holdout
+4. Fit a dummy baseline and record metrics
+5. Fit a simple scikit-learn **Pipeline** (baseline model)
+6. Save a run folder under `models/runs/<run_id>/`
+7. Write `models/registry/latest.txt`
+8. Print where things were saved
+
+---
+
+## Run folder mental model
+
+Each run folder is a snapshot:
+
+- the model you trained
+- the data contract you assumed
+- the metrics you got
+- the config you used (seed, split, target, …)
+
+::: callout-tip
+A run folder is how you make training reproducible and reviewable.
+:::
+
+---
+
+## Minimum artifacts to understand today
+
+Inside `models/runs/<run_id>/` focus on:
+
+- `metrics/baseline_holdout.json`  ✅ (your floor)
+- `model/model.joblib` ✅ (your saved model)
+
+::: {.muted}
+You may see extra files (schema, tables, holdout metrics). We’ll explain them more on Day 3.
+:::
+
+---
+
+## Micro-exercise: find the artifacts (4 minutes)
+
+Match the question → the file:
+
+1. “What is the baseline score?”  
+2. “Which run is the newest?”  
+3. “Where is the saved model object?”
+
+**Checkpoint:** you can name the file path for each.
+
+---
+
+## Solution: artifact locations
+
+1. `models/runs/<run_id>/metrics/baseline_holdout.json`  
+2. `models/registry/latest.txt`  
+3. `models/runs/<run_id>/model/model.joblib`
+
+---
+
+## Determinism (why we care about seeds)
+
+- Same seed → same split → fair comparisons across runs
+- Different seed → different split → metrics can change a little
+
+::: callout-note
+We don’t need “perfect” metrics today — we need **repeatable** training.
+:::
+
+---
+
+## Session 3 recap
+
+- `train` turns your feature table into a versioned run
+- Baseline metrics + saved model are the minimum outcomes today
+- Seeds make comparisons meaningful
+
+# Isha break {.splash}
+
+## 20 minutes
+
+**When you return:** start Hands-on Task 1 immediately.
+
+# Hands-on
+
+::: {.muted}
+Run training + inspect baseline + update model card
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+**Minimum ✅**
+- `uv run ml-baseline train --target ...` runs successfully
+- a new run folder exists under `models/runs/<run_id>/`
+- `metrics/baseline_holdout.json` exists
+- `model/model.joblib` exists
+- you updated `reports/model_card.md` (evaluation plan section)
+- 1+ commit pushed to GitHub
+
+**Optional ⭐**
+- run training with a different seed and compare metrics
+- try `--split-strategy time` or `--split-strategy group` on your own dataset (if you have one)
+
+---
+
+## Project touch points (Day 2)
+
+```text
+src/ml_baseline/
+  train.py       # orchestration: load → split → baseline → fit → save
+  splits.py      # random/time/group split helpers
+  metrics.py     # metric helpers
+  pipeline.py    # preprocessing + model (baseline pipeline)
+models/
+  runs/<run_id>/
+  registry/latest.txt
+reports/
+  model_card.md
+```
+
+---
+
+## Task 1 — Run training once (15 minutes)
+
+1. Ensure sample data exists
+2. Run training for the sample target
+3. Copy the printed run folder path
+
+```bash
+uv run ml-baseline make-sample-data
+uv run ml-baseline train --target is_high_value
+```
+
+**Checkpoint:** terminal prints `Saved run: .../models/runs/<run_id>`.
+
+---
+
+## Solution — expected output shape
+
+You should see something like:
+
+- `Saved run: .../models/runs/2025-12-29T...Z__classification__seed42`
+
+::: callout-note
+Your run_id will be different. That’s good: each run is versioned.
+:::
+
+---
+
+## Task 2 — Inspect the run folder (15 minutes)
+
+List the run folders, open `latest.txt`, and confirm the minimum artifacts exist
+
+**macOS/Linux**
+```bash
+ls models/runs
+cat models/registry/latest.txt
+ls models/runs/$(cat models/registry/latest.txt)
+```
+
+**Windows PowerShell**
+```powershell
+ls models/runs
+type models/registry/latest.txt
+ls models/runs/$(Get-Content models/registry/latest.txt)
+```
+
+**Checkpoint:** you can see `metrics/` and `model/` inside the run.
+
+---
+
+## Solution — run folder checklist
+
+```text
+models/runs/<run_id>/
+  metrics/baseline_holdout.json   ✅
+  model/model.joblib              ✅
+  ...
+```
+
+::: {.muted}
+Ignore the “...” for now. We’ll use more artifacts tomorrow.
+:::
+
+---
+
+## Task 3 — Read baseline metrics (15 minutes)
+
+1. Open the baseline JSON file
+2. Answer:
+   - what is the baseline’s accuracy?
+   - what is the baseline’s recall?
+   - what does that imply about your class balance?
+
+::: aside
+The commands are in the next slide.
+:::
+
+---
+
+## Task 3 — Read baseline metrics (15 minutes)
+
+**macOS/Linux**
+```bash
+LATEST_ID=$(cat models/registry/latest.txt)
+
+python -m json.tool \
+    models/runs/$LATEST_ID/metrics/baseline_holdout.json
+```
+
+**Windows PowerShell**
+```powershell
+$LatestID = Get-Content models/registry/latest.txt
+
+python -m json.tool `
+    models/runs/$LatestID/metrics/baseline_holdout.json
+```
+
+**Checkpoint:** you can explain the baseline in 1–2 sentences.
+
+---
+
+## Solution — what to look for
+
+- If accuracy is high and recall is low, the target might be imbalanced.
+- Your next job is to beat this baseline **on the holdout** (not on training).
+
+::: callout-tip
+Write your baseline result (1–2 numbers) into your `eval_summary.md` later this week.
+:::
+
+---
+
+## Task 4 — Update your model card (10 minutes)
+
+Open `reports/model_card.md` and update:
+
+- Split strategy: **random holdout**
+- Test size + seed (whatever you used)
+- Primary metric (pick one)
+
+**Checkpoint:** your model card evaluation plan has no blanks.
+
+---
+
+## Task 5 — Quality gates (10 minutes)
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+```
+
+**Checkpoint:** all commands exit with code 0.
+
+---
+
+## Git checkpoint (2 minutes)
+
+- `git status`
+- commit message: `"w3d2: train + baseline"`
+- push to GitHub
+
+**Checkpoint:** your commit appears on GitHub.
+
+---
+
+## Solution — Git commands
+
+```bash
+git status
+git add reports/model_card.md
+git add -A
+git commit -m "w3d2: train + baseline"
+git push
+```
+
+---
+
+## Debug playbook (common Day 2 errors) {.smaller}
+
+- `Missing target column` → check `--target` matches your file’s column name
+- “file not found” → confirm `data/processed/features.*` exists
+- “could not convert string to float” → you forgot categorical handling (pipeline issue)
+- Parquet errors → install optional dependency: `uv sync --extra parquet`
+
+::: callout-warning
+Make one change at a time. Re-run `train`. Don’t “randomly tweak”.
+:::
+
+---
+
+## Stretch goals (optional)
+
+⭐ If you finish early:
+
+- Run with a different seed: `--seed 7` and compare baseline metrics
+- If your own dataset has a time column, try `--split-strategy time`
+- (Strong students) add cross-validation on the training split (don’t remove holdout)
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences each:
+
+1. Why do we need a **holdout** split?
+2. What is the purpose of a **Dummy baseline**?
+3. Which metric did you pick as your primary metric, and why?
+
+---
+
+## What to do after class (Day 2 assignment) {.smaller}
+
+**Due:** before Day 3 (Dec 30, 2025)
+
+1. Make sure this command runs:
+   - `uv run ml-baseline train --target <your_target>`
+2. Confirm you can find:
+   - `metrics/baseline_holdout.json`
+   - `model/model.joblib`
+3. Update `reports/model_card.md` evaluation plan section
+4. Commit + push
+
+**Deliverable:** GitHub repo link + the `run_id` from your latest run.
+
+::: callout-tip
+Do not commit `models/runs/`. Commit code + reports.
+:::
+
+# Thank You! {.splash}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

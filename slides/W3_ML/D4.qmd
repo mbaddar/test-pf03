@@ -1,0 +1,736 @@
+---
+pagetitle: "W3 D4"
+date: 2025-12-31
+---
+
+## Announcements / admin
+
+- Today’s theme: **training is not done until prediction works**
+- We will use **yesterday’s artifacts**:
+  - `schema/input_schema.json`
+  - `tables/holdout_input.*`
+- Goal: `ml-baseline predict` works on new files **with guardrails**
+
+::: callout-note
+Don’t commit generated artifacts: `models/runs/`, `outputs/`, `data/processed/`.
+:::
+
+# Day 4: Predict CLI + inference contracts
+
+**Goal:** run `ml-baseline predict` on new data **reliably** (schema guardrails + correct outputs).
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** “A model you can’t run on new data is not a product.”
+**Do:** show `outputs/preds.csv` and explain: input → validate → predict → write.
+:::
+
+---
+
+## Today’s Flow {.smaller}
+
+- **Session 1 (60m):** Inference mental model (inputs, outputs, thresholds)
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Schema validation + alignment (fail fast)
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Predict command end-to-end (run registry + sanity checks)
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Implement/verify `predict` and test on holdout + “new” files
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+- Explain the **inference contract** (what goes in, what comes out)
+- Run `ml-baseline predict` on `holdout_input.*` successfully
+- Enforce `input_schema.json` (missing required columns → error; forbidden columns → error)
+- Preserve optional ID columns in prediction outputs
+- Do 3 sanity checks on prediction outputs (rows, columns, ranges)
+- Add 1–2 helpful failure messages that save debugging time
+
+---
+
+## Warm-up (5 minutes)
+
+Run prediction on your saved holdout input.
+
+**macOS/Linux**
+```bash
+run_id=$(cat models/registry/latest.txt)
+holdout=$(ls models/runs/$run_id/tables/holdout_input.* | head -n 1)
+uv run ml-baseline predict --run latest --input "$holdout" --output outputs/preds.csv
+head -n 6 outputs/preds.csv
+```
+
+**Windows PowerShell**
+```powershell
+$run_id = Get-Content models/registry/latest.txt
+$holdout = (Get-ChildItem "models/runs/$run_id/tables" -Filter "holdout_input.*" | Select-Object -First 1).FullName
+uv run ml-baseline predict --run latest --input $holdout --output outputs/preds.csv
+Get-Content outputs/preds.csv -TotalCount 6
+```
+
+**Checkpoint:** you produced `outputs/preds.csv` and it has `prediction` (and maybe `score`).
+
+---
+
+## Where today fits in the Week 3 loop
+
+```text
+Define → Split → Baseline → Train → Evaluate → Save → Predict → Report
+```
+
+::: {.muted}
+Today: **Predict** uses yesterday’s **schema + holdout_input**.
+:::
+
+# Session 1
+
+::: {.muted}
+Inference mental model (inputs, outputs, thresholds)
+:::
+
+---
+
+## Session 1 objectives
+
+- Define “**inference**” in 1 sentence
+- Describe the **input contract** (no target; required features must exist)
+- Describe the **output contract** (predictions file)
+- Understand what a **threshold** does (classification)
+
+---
+
+## Training vs inference (the only difference that matters)
+
+:::: {.columns}
+::: {.column width="50%"}
+**Training**
+- input: features **+ target (y)**
+- output: a saved model (pipeline)
+- you compute metrics (holdout)
+:::
+
+::: {.column width="50%"}
+**Inference**
+- input: features **only**
+- output: predictions file
+- you must handle missing/extra columns safely
+:::
+::::
+
+::: callout-warning
+If the target leaks into inference input, your system becomes “cheat mode” and metrics become meaningless.
+:::
+
+---
+
+## Inference contract (what goes in / what comes out)
+
+**Input file** (`--input`)
+- must include: `schema.required_feature_columns`
+- may include: `schema.optional_id_columns` (pass-through)
+- must NOT include: `schema.forbidden_columns` (usually the target)
+
+**Output file** (`--output`)
+- always includes: `prediction`
+- classification also includes: `score`
+- includes ID columns if they were provided in the input
+
+---
+
+## Classification outputs: score vs prediction
+
+:::: {.columns}
+::: {.column width="55%"}
+**Score**
+- a probability-like number
+- used to rank cases
+
+**Prediction**
+- a 0/1 decision
+- made by `score >= threshold`
+:::
+
+::: {.column width="45%"}
+**Example**
+
+| score | threshold | prediction |
+|---:|---:|---:|
+| 0.82 | 0.50 | 1 |
+| 0.49 | 0.50 | 0 |
+| 0.82 | 0.90 | 0 |
+:::
+::::
+
+::: {.muted}
+The same score can become a different decision if you change the threshold.
+:::
+
+---
+
+## Thresholds: keep it simple today
+
+**Minimum ✅**
+- use a fixed threshold (0.50) for classification
+
+**Optional ⭐**
+- choose threshold to maximize F1 (`max_f1`)
+- choose threshold to meet a business rule (e.g., precision ≥ 0.80)
+
+::: callout-tip
+Pick one decision policy and document it in your model card.
+:::
+
+---
+
+## Quick Check
+
+**Question:** If we increase the threshold from 0.50 to 0.80, what usually happens?
+
+A) More predicted positives, higher recall
+B) Fewer predicted positives, higher precision (often)
+C) Nothing changes
+
+. . .
+
+**Answer:** **B** (fewer positives; precision often increases; recall often decreases).
+
+---
+
+## Micro-exercise: design your prediction output (6 minutes)
+
+In pairs:
+
+1. Decide which columns your `outputs/preds.csv` must contain
+2. Decide which columns should be “pass-through” IDs
+3. Write one sentence: “A teammate can use this output to ___.”
+
+**Checkpoint:** you can explain score vs prediction in one sentence.
+
+---
+
+## Solution (example)
+
+- Classification output columns: `user_id` (optional), `score`, `prediction`
+- Pass-through IDs: columns like `user_id`, `customer_id`, `transaction_id`
+- Sentence: “A teammate can use this file to rank customers by score and take action on predicted positives.”
+
+---
+
+## Session 1 recap
+
+- Inference = run a saved model on features-only input
+- Output = predictions (and score for classification)
+- Threshold converts score → decision
+
+# Asr break {.splash}
+
+## 20 minutes
+
+**When you return:** open `schema/input_schema.json` in your latest run.
+
+# Session 2
+
+::: {.muted}
+Schema validation + alignment (fail fast)
+:::
+
+---
+
+## Session 2 objectives
+
+- Explain why we validate inference inputs
+- Implement/verify `validate_and_align(df, schema)`
+- Fail fast on:
+  - forbidden columns
+  - missing required features
+- Preserve optional IDs in the output
+
+---
+
+## Real-world CSV problems (that break models)
+
+- A required column is missing
+- A column name changed (typo / rename)
+- The target column was accidentally included
+- A numeric column arrives as text (`"12"`, `"N/A"`)
+
+::: callout-tip
+Your schema turns “mysterious errors” into **clear messages**.
+:::
+
+---
+
+## What `validate_and_align(...)` must do
+
+```text
+input df
+  → check forbidden (fail)
+  → check missing required (fail)
+  → select optional IDs (passthrough)
+  → coerce dtypes (simple)
+  → return (X, ids)
+```
+
+::: {.muted}
+This function is the “seatbelt” for your predict command.
+:::
+
+---
+
+## Example: validation rules
+
+If inference input contains:
+
+- `is_high_value` (target) → **error: forbidden column**
+- missing `avg_spend_30d` → **error: missing required feature**
+- extra column `notes` → ignore (unless you choose to fail) ⭐ optional
+
+::: callout-warning
+Do not silently fill missing required features. Fail fast.
+:::
+
+---
+
+## Friendly failures: prefer `ValueError` over `assert`
+
+:::: {.columns}
+::: {.column width="50%"}
+**Hard to read**
+- `assert not missing`
+- can be skipped with Python optimizations
+- message might be unclear
+:::
+
+::: {.column width="50%"}
+**Better**
+- `raise ValueError("Missing required columns: ...")`
+- always runs
+- clear for teammates
+:::
+::::
+
+::: {.muted}
+Asserts are okay for learning — but clear errors are better for shipping.
+:::
+
+---
+
+## Micro-exercise: what should the error say? (6 minutes)
+
+You receive this inference file columns:
+
+```text
+["user_id", "country", "avg_spend_30d", "is_high_value"]
+```
+
+1. What is the problem?
+2. Write the error message you want a teammate to see.
+
+**Checkpoint:** your message includes the exact bad column name.
+
+---
+
+## Solution (example)
+
+- Problem: target column `is_high_value` is present (forbidden)
+- Example error message:
+  - `Forbidden columns present in inference input: ['is_high_value']`
+
+---
+
+## Quick Check
+
+**Question:** Should we automatically add a missing required feature column as zeros?
+
+. . .
+
+**Answer:** Usually **no**. That hides data problems and can silently degrade predictions.
+
+---
+
+## Session 2 recap
+
+- Schema validation prevents silent bugs
+- Fail fast on forbidden/missing columns
+- Return `(X, ids)` so IDs can be preserved in outputs
+
+# Maghrib break {.splash}
+
+## 20 minutes
+
+**When you return:** be ready to run `predict` on a file with an intentional mistake.
+
+# Session 3
+
+::: {.muted}
+Predict end-to-end (run registry + sanity checks)
+:::
+
+---
+
+## Session 3 objectives
+
+- Explain what a **run folder** is and why we load from it
+- Use `--run latest` to predict without guessing paths
+- Do sanity checks on prediction outputs
+
+---
+
+## Run folders: prediction must be reproducible
+
+A trained run lives at:
+
+```text
+models/runs/<run_id>/
+  model/model.joblib
+  schema/input_schema.json
+  run_meta.json
+```
+
+And the “pointer” lives at:
+
+```text
+models/registry/latest.txt
+```
+
+::: callout-tip
+`latest.txt` lets you predict without copy/pasting long paths.
+:::
+
+---
+
+## Predict command anatomy
+
+**Example**
+
+```bash
+uv run ml-baseline predict \
+  --run latest \
+  --input data/processed/features.csv \
+  --output outputs/preds.csv
+```
+
+Under the hood:
+
+1. resolve run dir (`latest` → `models/runs/<run_id>`)
+2. load schema + model
+3. read input table
+4. validate + align columns
+5. predict + write output
+
+---
+
+## Sanity checks after `predict`
+
+Minimum checks you should do every time:
+
+1. **Row count:** output rows == input rows
+2. **Columns:** output contains expected columns
+3. **Ranges:**
+   - classification: `0 ≤ score ≤ 1`
+   - regression: predictions are finite (no all-NaN)
+
+::: callout-tip
+If row counts don’t match, stop. Something is wrong.
+:::
+
+---
+
+## Optional ⭐: a tiny “skew check” idea
+
+Not required today, but good to know:
+
+- Compare today’s inference input to yesterday’s `holdout_input`:
+  - missingness rates
+  - numeric ranges (min/max)
+  - new/unseen categories
+
+::: {.muted}
+We’ll do richer checks in Week 7 (MLOps). Today we just ship predict.
+:::
+
+---
+
+## Session 3 recap
+
+- A run folder contains everything needed for inference
+- `--run latest` uses `models/registry/latest.txt`
+- Always do sanity checks after prediction
+
+# Isha break {.splash}
+
+## 20 minutes
+
+**When you return:** start Hands-on Task 1 immediately.
+
+# Hands-on
+
+::: {.muted}
+Implement/verify `predict` end-to-end
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+**Minimum ✅**
+- `uv run ml-baseline predict --run latest ...` writes an output file
+- Input schema is enforced:
+  - forbidden target column → clear error
+  - missing required feature → clear error
+- Output includes optional IDs if they exist in the input
+- `uv run pytest` passes
+- 1+ commit pushed to GitHub
+
+**Optional ⭐**
+- Improve error messages (ValueError + actionable hint)
+- Add `--threshold` override behavior (classification)
+- Add a tiny skew-check script (missingness + ranges)
+
+---
+
+## Project touch points (Day 4)
+
+```text
+src/ml_baseline/
+  predict.py     # run_predict + resolve_run_dir
+  schema.py      # InputSchema + validate_and_align
+  io.py          # read_tabular / write_tabular
+models/runs/<run_id>/
+  model/
+  schema/
+outputs/
+  preds.csv
+```
+
+---
+
+## Task 1 — Predict on holdout_input (15 minutes)
+
+1. Find `holdout_input.*` inside your latest run
+2. Run `predict` on it
+3. Inspect the output file
+
+**macOS/Linux**
+```bash
+run_id=$(cat models/registry/latest.txt)
+holdout=$(ls models/runs/$run_id/tables/holdout_input.* | head -n 1)
+uv run ml-baseline predict --run latest --input "$holdout" --output outputs/preds.csv
+head -n 6 outputs/preds.csv
+```
+
+**Windows PowerShell**
+```powershell
+$run_id = Get-Content models/registry/latest.txt
+$holdout = (Get-ChildItem "models/runs/$run_id/tables" -Filter "holdout_input.*" | Select-Object -First 1).FullName
+uv run ml-baseline predict --run latest --input $holdout --output outputs/preds.csv
+Get-Content outputs/preds.csv -TotalCount 6
+```
+
+**Checkpoint:** output file exists and includes `prediction`.
+
+---
+
+## Task 2 — Create an intentional failure (10 minutes)
+
+Goal: prove your guardrails work.
+
+1. Copy `holdout_input.*` to `outputs/bad_input.csv`
+2. Add the target column name (or delete one required feature)
+3. Run `predict` again
+
+**Checkpoint:** `predict` fails with a **clear message**.
+
+---
+
+## Hint: easiest way to create a bad file
+
+- If you have `holdout_input.csv`, open it and add a column header:
+  - `is_high_value`
+- Or delete one required feature header
+
+::: callout-tip
+You’re testing the contract, not the model.
+:::
+
+---
+
+## Task 3 — Verify/implement `resolve_run_dir` (10 minutes)
+
+Open: `src/ml_baseline/predict.py`
+
+Ensure:
+
+- `--run latest` loads `models/registry/latest.txt`
+- it returns `models/runs/<run_id>`
+- it errors clearly when latest doesn’t exist
+
+**Checkpoint:** `ml-baseline show-run latest` prints `run_meta.json`.
+
+---
+
+## Solution (example logic)
+
+```python
+if run == "latest":
+    p = models_dir / "registry" / "latest.txt"
+    if not p.exists():
+        raise FileNotFoundError("No latest.txt found. Train a model first.")
+    run_id = p.read_text(encoding="utf-8").strip()
+    return models_dir / "runs" / run_id
+return Path(run).resolve()
+```
+
+---
+
+## Task 4 — Verify/implement `validate_and_align` (25 minutes)
+
+Open: `src/ml_baseline/schema.py`
+
+Minimum behavior:
+
+1. Fail if forbidden columns exist
+2. Fail if required columns are missing
+3. Return:
+   - `X` with required features in schema order
+   - `ids` with optional ID columns (if present)
+
+**Checkpoint:** `predict` works on good input and fails on bad input.
+
+---
+
+## Solution pattern (high level)
+
+```text
+- forbidden = ...
+- missing = ...
+- ids = df[optional_ids]
+- coerce dtypes (optional)
+- X = df[required_features]
+- return X, ids
+```
+
+::: {.muted}
+Keep it boring. Reliability beats cleverness.
+:::
+
+---
+
+## Task 5 — Output contract (10 minutes)
+
+After prediction, check:
+
+- output row count equals input row count
+- columns are correct:
+  - classification: `score`, `prediction` (+ IDs)
+  - regression: `prediction` (+ IDs)
+
+**Checkpoint:** you can point to one row and explain it.
+
+---
+
+## Task 6 — Tests + small doc update (15 minutes)
+
+1. Run tests:
+
+```bash
+uv run pytest
+```
+
+2. Update `reports/model_card.md`:
+- add a short “How to predict” section (1–3 commands)
+- list what inference input must contain
+
+**Checkpoint:** tests pass and model card explains prediction.
+
+---
+
+## Vibe coding (safe version)
+
+1. Write the plan in 5 bullets (no code yet)
+2. Implement the smallest piece
+3. Run → break → read error → fix
+4. Commit
+5. Repeat
+
+::: callout-warning
+Do not ask GenAI to write your solution code. Ask it to explain concepts or errors.
+:::
+
+---
+
+## Git checkpoint (2 minutes)
+
+- `git status`
+- commit with message: `"w3d4: predict cli + schema guardrails"`
+- push to GitHub
+
+**Checkpoint:** repo shows the new commit online.
+
+---
+
+## Debug playbook (predict edition)
+
+1. Confirm files exist:
+   - `models/registry/latest.txt`
+   - `models/runs/<run_id>/model/model.joblib`
+   - `models/runs/<run_id>/schema/input_schema.json`
+2. Print columns of your input file
+3. Compare with schema required list
+4. If it fails, fix schema validation first
+
+::: callout-tip
+Most predict bugs are **column contract** bugs, not model bugs.
+:::
+
+---
+
+## Stretch goals (optional ⭐)
+
+- Add `--threshold` override in `predict` (classification)
+- Add a “strict mode” (`--strict`) to fail on extra columns
+- Add a tiny skew-check script that prints:
+  - missingness rate per column
+  - numeric min/max
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences each:
+
+1. What is the difference between a **score** and a **prediction**?
+2. Name 2 ways inference input can break a model.
+3. What file makes `--run latest` possible?
+
+---
+
+## What to do after class (Day 4 assignment)
+
+**Due:** before Day 5 (Jan 1, 2026)
+
+1. Run `predict` on 2 inputs:
+   - your `holdout_input.*`
+   - one “new” file you create (copy + edit 5 rows)
+2. Write 3 bullet points in `reports/model_card.md`:
+   - required columns
+   - forbidden columns
+   - how to run predict
+3. Commit + push
+
+**Deliverable:** GitHub repo link + screenshot of `outputs/preds.csv` (first 5 rows).
+
+::: callout-tip
+Tomorrow you’ll polish reporting + submission. Today is about **reliable inference**.
+:::
+
+# Thank You! {.splash}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

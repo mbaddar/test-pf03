@@ -1,0 +1,805 @@
+---
+pagetitle: "W3 D3"
+date: 2025-12-30
+---
+
+## GenAI policy reminder (still in effect)
+
+You may use Generative AI **only** for clarifying questions.
+
+- ✅ Allowed: definitions, “what does this error mean?”, reading docs, concept explanations
+- ❌ Not allowed: generating your solution code, debugging by copy‑paste, writing full functions
+
+::: callout-warning
+Today you will write evaluation + artifact code. If GenAI writes it for you, you lose the skill you need for Week 7/8.
+:::
+
+---
+
+## Announcements / admin
+
+- Today we make your training run **debuggable**:
+  - not just “it ran”
+  - but “we can inspect mistakes and trust the metrics”
+- Tomorrow (Day 4) depends on today: `predict` will use your **input schema**
+- Don’t commit generated artifacts:
+  - `models/runs/`, `data/processed/`, `outputs/` should stay gitignored
+
+::: callout-note
+Keep `reports/eval_summary.md` open — you’ll update it with baseline vs model results.
+:::
+
+# Day 3: Evaluate + artifacts
+
+**Goal:** compute and save **holdout metrics**, a **holdout predictions table**, and an **input schema** for reliable prediction.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** “Day 2 proved we can train. Day 3 proves we can *evaluate and debug*.”
+**Do:** show a run folder with `metrics/` + `tables/` + `schema/`.
+:::
+
+---
+
+## Today’s Flow {.smaller}
+
+- **Session 1 (60m):** Holdout metrics you can trust
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Save the rows (holdout predictions + holdout input)
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Input schema contract (for Day 4 predict)
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Implement/verify artifacts + update eval summary + Git push
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+- Explain the difference between **baseline metrics** and **model metrics**
+- Read `holdout_metrics.json` and say what it means in plain English
+- Use `holdout_predictions.csv` to find **false positives / false negatives**
+- Explain why we save `holdout_input.csv` (inference-shaped input)
+- Create and save `schema/input_schema.json` from training data
+- Update `reports/eval_summary.md` with baseline vs model comparison
+
+---
+
+## Warm-up (5 minutes)
+
+Run yesterday’s training and find your latest run folder.
+
+**macOS/Linux**
+```bash
+uv run ml-baseline make-sample-data
+uv run ml-baseline train --target is_high_value
+cat models/registry/latest.txt
+ls models/runs/$(cat models/registry/latest.txt)
+```
+
+**Windows PowerShell**
+```powershell
+uv run ml-baseline make-sample-data
+uv run ml-baseline train --target is_high_value
+type models/registry/latest.txt
+ls models/runs/$(Get-Content models/registry/latest.txt)
+```
+
+**Checkpoint:** your latest run folder exists under `models/runs/<run_id>/`.
+
+---
+
+## Where today fits in the Week 3 loop
+
+```text
+Define → Split → Baseline → Train → Evaluate → Save → Predict → Report
+```
+
+::: {.muted}
+Today: **Evaluate + Save artifacts**.  
+Tomorrow: **Predict CLI** uses today’s schema + holdout_input.
+:::
+
+# Session 1
+
+::: {.muted}
+Holdout metrics you can trust
+:::
+
+---
+
+## Session 1 objectives
+
+- Define “**holdout metrics**” in 1 sentence
+- Compare **baseline vs model** fairly (same holdout split)
+- Pick **one primary metric** to report (don’t chase all numbers)
+
+---
+
+## Why training metrics are not enough
+
+Training performance can look great even when the model is useless.
+
+- Training data includes the answers (y)
+- The model can “memorize patterns” that don’t generalize
+- We evaluate on a **holdout set** to simulate new data
+
+::: callout-warning
+If your holdout split is wrong (leakage / duplicates / time mix-up), your metrics will lie.
+:::
+
+---
+
+## Baseline vs model (the only comparison that matters)
+
+:::: {.columns}
+::: {.column width="48%"}
+**Baseline**
+- a “no-skill” prediction
+- sets the **floor**
+- file: `metrics/baseline_holdout.json`
+:::
+
+::: {.column width="52%"}
+**Model**
+- trained pipeline
+- must beat the baseline
+- file: `metrics/holdout_metrics.json`
+:::
+::::
+
+::: callout-tip
+Same split. Same holdout. Same metric. Only then you can claim improvement.
+:::
+
+---
+
+## Classification: 3 metrics in plain English
+
+For binary classification:
+
+- **Accuracy:** “How often are we correct?”
+- **Precision:** “When we predict positive, how often are we right?”
+- **Recall:** “Of the true positives, how many did we catch?”
+
+::: {.muted}
+F1 combines precision + recall (useful, but pick **one primary** metric first).
+:::
+
+---
+
+## Regression: start with MAE
+
+For regression:
+
+- **MAE (Mean Absolute Error):** average absolute mistake size  
+  *(measured in the same units as the target)*
+
+::: {.muted}
+RMSE and R² exist — but MAE is the easiest to interpret first.
+:::
+
+---
+
+## Quick Check
+
+**Question:** If false positives are very expensive, which metric do you usually care about more?
+
+A) Accuracy  
+B) Precision  
+C) Recall
+
+. . .
+
+**Answer:** **Precision** (you want “predicted positive” to be trustworthy).
+
+---
+
+## Micro-exercise: choose the primary metric (6 minutes)
+
+Scenario: we predict **high-value customers** to give them an expensive benefit.
+
+1. Which mistake is more expensive: **false positive** or **false negative**?
+2. Pick a **primary metric** (accuracy / precision / recall).
+3. Write 1 sentence: “Primary metric = ___ because ___.”
+
+**Checkpoint:** you can explain your choice to your partner.
+
+---
+
+## Solution (example)
+
+- False positives are expensive → we waste budget on the wrong customers
+- **Primary metric:** **precision**
+- Sentence example: “Primary metric is precision because a positive prediction triggers an expensive action.”
+
+---
+
+## What a holdout metrics file looks like
+
+Example fields (yours may include more):
+
+```json
+{
+  "accuracy": 0.82,
+  "precision": 0.40,
+  "recall": 0.25,
+  "f1": 0.31,
+  "threshold": 0.50
+}
+```
+
+::: callout-tip
+You don’t have to “optimize everything.”  
+Report your primary metric + 1 supporting metric.
+:::
+
+---
+
+## Session 1 recap
+
+- Holdout metrics simulate “new data”
+- Baseline vs model is the meaningful comparison
+- Pick a primary metric based on the decision (FP vs FN cost)
+
+# Asr break {.splash}
+
+## 20 minutes
+
+**When you return:** be ready to explain your primary metric choice.
+
+# Session 2
+
+::: {.muted}
+Save the rows (holdout predictions + holdout input)
+:::
+
+---
+
+## Session 2 objectives
+
+- Explain why metrics alone are not enough
+- Save `holdout_predictions.*` (the “debug table”)
+- Save `holdout_input.*` (inference-shaped input for Day 4)
+
+---
+
+## Metrics hide the story (rows show it)
+
+A single number can’t tell you:
+
+- *which* rows failed
+- whether failures are concentrated in one segment
+- if the model is “cheating” using an ID-like feature
+
+::: callout-tip
+Saving a predictions table makes debugging **possible**.
+:::
+
+---
+
+## Holdout predictions table (minimum columns)
+
+**Classification**
+
+- optional IDs (passthrough)
+- `score` (probability-like)
+- `prediction` (0/1 after threshold)
+- the true target column (for evaluation only)
+
+**Regression**
+- optional IDs (passthrough)
+- `prediction`
+- the true target column (for evaluation only)
+
+---
+
+## Example: `holdout_predictions.csv` (classification)
+
+| user_id | score | prediction | is_high_value |
+|---|---:|---:|---:|
+| U_001 | 0.91 | 1 | 1 |
+| U_002 | 0.73 | 1 | 0 |
+| U_003 | 0.12 | 0 | 0 |
+| U_004 | 0.48 | 0 | 1 |
+| U_005 | 0.66 | 1 | 1 |
+
+::: {.muted}
+U_002 is a **false positive**. U_004 is a **false negative**.
+:::
+
+---
+
+## Micro-exercise: find the errors (5 minutes)
+
+Using the table:
+
+1. Mark all **false positives (FP)** and **false negatives (FN)**
+2. Which is worse for our scenario: FP or FN?
+3. Optional: What happens if we increase the threshold from 0.50 to 0.70?
+
+**Checkpoint:** you can point to 1 FP and 1 FN row.
+
+---
+
+## Solution (example)
+
+- FP: `prediction=1` and `target=0` → **U_002**
+- FN: `prediction=0` and `target=1` → **U_004**
+- If we increase threshold to 0.70:
+  - fewer predicted positives → fewer FPs
+  - but we might miss more true positives (recall drops) ⭐ optional idea
+
+---
+
+## Why we save `holdout_input.*`
+
+`holdout_input` is the holdout set **without the target**.
+
+We save it because:
+
+- it has the same shape as real inference input
+- tomorrow we will run: `ml-baseline predict` on it
+- it helps detect training/inference mismatches (skew checks later)
+
+::: callout-warning
+Never include the target column inside `holdout_input`.
+:::
+
+---
+
+## `run_meta.json` (one file to explain the run)
+
+This is a small “receipt” for your run:
+
+- which dataset file was used (path + hash)
+- what config was used (seed, split strategy, target)
+- baseline + model metrics
+- where artifacts are stored inside the run folder
+
+::: {.muted}
+You don’t need to overthink it. You just need the habit: every run is explainable.
+:::
+
+---
+
+## Quick Check
+
+**Question:** Why do we save `holdout_input` separately?
+
+. . .
+
+**Answer:** It’s inference-shaped input we can reuse to test prediction (and later check for skew).
+
+---
+
+## Session 2 recap
+
+- Save rows, not just numbers: `holdout_predictions` enables debugging
+- Save inference-shaped input: `holdout_input` enables reliable prediction testing
+- Store a run receipt: `run_meta.json`
+
+# Maghrib break {.splash}
+
+## 20 minutes
+
+**When you return:** open your latest run folder and inspect `tables/`.
+
+# Session 3
+
+::: {.muted}
+Input schema contract (for Day 4 predict)
+:::
+
+---
+
+## Session 3 objectives
+
+- Define an **input schema** in plain English
+- Save `schema/input_schema.json`
+- Understand the 2 failure modes it prevents:
+  - forbidden columns
+  - missing required columns
+
+---
+
+## Prediction needs a contract
+
+Real life problem:
+
+- a teammate sends a CSV with a missing column
+- or a column is renamed (`age_years` vs `age`)
+- or the target accidentally appears in inference input
+
+Without a contract, prediction becomes “guess and pray”.
+
+::: callout-tip
+Your schema is a **machine-checkable version** of your dataset contract from Day 1.
+:::
+
+---
+
+## What goes into `input_schema.json`
+
+Minimum fields:
+
+- `required_feature_columns` (exact list, ordered)
+- `feature_dtypes` (basic numeric vs text handling)
+- `optional_id_columns` (passthrough if present)
+- `forbidden_columns` (usually the target)
+
+---
+
+## Example: `input_schema.json`
+
+```json
+{
+  "required_feature_columns": ["age", "country", "avg_spend_30d"],
+  "optional_id_columns": ["user_id"],
+  "forbidden_columns": ["is_high_value"]
+}
+```
+
+::: {.muted}
+The actual file can include dtype hints too — that’s OK.
+:::
+
+---
+
+## Micro-exercise: map your model card → schema (6 minutes)
+
+Open your `reports/model_card.md` and write down:
+
+1. Your target column (forbidden at inference)
+2. 1–2 optional ID columns (passthrough)
+3. Your required features (X)
+
+**Checkpoint:** you can say: “My inference input must include ___ and must not include ___.”
+
+---
+
+## Solution (example)
+
+- Forbidden: target column (e.g., `is_high_value`)
+- Optional IDs: `user_id`
+- Required features: everything else used by the model (`age`, `country`, `avg_spend_30d`, ...)
+
+---
+
+## What should happen when schema validation fails?
+
+Two good failures:
+
+1. **Forbidden columns present** (leakage risk)
+2. **Missing required columns** (model can’t run correctly)
+
+::: callout-warning
+Fail fast with a clear error message. Silent fixes create silent bugs.
+:::
+
+---
+
+## Quick Check
+
+**Question:** Is it okay if the target column appears in the input to `predict`?
+
+. . .
+
+**Answer:** No. It is a **forbidden column** for inference.
+
+---
+
+## Session 3 recap
+
+- Schema = enforceable dataset contract
+- Required features must exist; forbidden columns must not
+- Saving schema today makes Day 4 prediction reliable
+
+# Isha break {.splash}
+
+## 20 minutes
+
+**When you return:** start Hands-on Task 1 immediately.
+
+# Hands-on
+
+::: {.muted}
+Implement/verify evaluation artifacts + update eval summary
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+**Minimum ✅**
+- After `ml-baseline train`, your latest run has:
+  - `metrics/baseline_holdout.json`
+  - `metrics/holdout_metrics.json`
+  - `tables/holdout_predictions.<csv|parquet>`
+  - `tables/holdout_input.<csv|parquet>`
+  - `schema/input_schema.json`
+  - `run_meta.json`
+- You can explain each artifact in **one sentence**
+- You updated `reports/eval_summary.md` with baseline vs model comparison
+- 1+ commit pushed to GitHub
+
+**Optional ⭐**
+- Implement threshold selection strategy `max_f1` (classification only)
+- Add a small error slice in `eval_summary.md` (e.g., performance by country)
+
+---
+
+## Project touch points (Day 3)
+
+```text
+src/ml_baseline/
+  train.py       # compute + save metrics/tables/schema
+  metrics.py     # metric helpers
+  schema.py      # schema contract
+  io.py          # read/write CSV/Parquet
+models/runs/<run_id>/
+  metrics/
+  tables/
+  schema/
+  run_meta.json
+reports/
+  eval_summary.md
+```
+
+---
+
+## Task 1 — Run train and inspect artifacts (15 minutes)
+
+1. Train (or retrain) on your target
+2. Locate the latest run folder
+3. Inspect `metrics/` and `tables/`
+
+**macOS/Linux**
+```bash
+uv run ml-baseline train --target is_high_value
+run_id=$(cat models/registry/latest.txt)
+ls models/runs/$run_id/metrics
+ls models/runs/$run_id/tables
+```
+
+**Windows PowerShell**
+```powershell
+uv run ml-baseline train --target is_high_value
+$run_id = Get-Content models/registry/latest.txt
+ls models/runs/$run_id/metrics
+ls models/runs/$run_id/tables
+```
+
+**Checkpoint:** you can see `holdout_metrics.json` **or** you know it’s missing and needs implementation.
+
+---
+
+## Solution — what “good” looks like
+
+```text
+models/runs/<run_id>/
+  metrics/
+    baseline_holdout.json
+    holdout_metrics.json
+  tables/
+    holdout_input.csv
+    holdout_predictions.csv
+  schema/
+    input_schema.json
+  run_meta.json
+```
+
+::: {.muted}
+Extensions may be `.parquet` instead of `.csv` depending on your setup.
+:::
+
+---
+
+## Task 2 — Save holdout metrics (20 minutes)
+
+If `holdout_metrics.json` is missing:
+
+1. In `src/ml_baseline/train.py`, after `pipe.fit(...)`, predict on `X_test`
+2. Compute metrics
+3. Save JSON to `run_dir/metrics/holdout_metrics.json`
+
+**Checkpoint:** file exists and contains your primary metric.
+
+---
+
+## Solution (example snippet) {.smaller}
+
+```python
+# after: pipe.fit(X_train, y_train)
+
+if cfg.task == "classification":
+    proba = pipe.predict_proba(X_test)
+    y_score = proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
+    y_true = np.asarray(y_test).astype(int)
+    metrics = classification_metrics(y_true, y_score, threshold=0.5)
+else:
+    y_pred = pipe.predict(X_test)
+    y_true = np.asarray(y_test).astype(float)
+    metrics = regression_metrics(y_true, y_pred)
+
+(run_dir / "metrics" / "holdout_metrics.json").write_text(
+    json.dumps(metrics, indent=2) + "\n", encoding="utf-8"
+)
+```
+
+---
+
+## Task 3 — Save `holdout_predictions` (15 minutes)
+
+1. Create a predictions DataFrame
+2. Add optional ID columns (passthrough)
+3. Add the true target column (for evaluation)
+4. Save to `run_dir/tables/holdout_predictions.<ext>`
+
+**Checkpoint:** you can open the file and see `prediction` (and `score` if classification).
+
+---
+
+## Solution (example snippet)
+
+```python
+# continuing from Task 2 variables: preds, y_true
+
+if id_cols_present:
+    preds = pd.concat(
+        [test_df[id_cols_present].reset_index(drop=True), preds.reset_index(drop=True)],
+        axis=1,
+    )
+
+preds[cfg.target] = y_true
+write_tabular(preds, run_dir / "tables" / f"holdout_predictions{ext}")
+```
+
+---
+
+## Task 4 — Save `holdout_input` (10 minutes)
+
+1. Start from `X_test` (features-only)
+2. Add optional ID columns (passthrough)
+3. Save to `run_dir/tables/holdout_input.<ext>`
+
+**Checkpoint:** `holdout_input` contains **no target** column.
+
+---
+
+## Solution (example snippet)
+
+```python
+holdout_input = X_test.copy()
+
+if id_cols_present:
+    holdout_input = pd.concat(
+        [test_df[id_cols_present].reset_index(drop=True), holdout_input.reset_index(drop=True)],
+        axis=1,
+    )
+
+write_tabular(holdout_input, run_dir / "tables" / f"holdout_input{ext}")
+```
+
+---
+
+## Task 5 — Save the input schema (10 minutes)
+
+1. Build schema from your training dataframe
+2. Save to `run_dir/schema/input_schema.json`
+
+**Checkpoint:** the schema lists required features + forbidden target.
+
+---
+
+## Solution (example snippet)
+
+```python
+schema = InputSchema.from_training_df(train_df, target=cfg.target, id_cols=list(cfg.id_cols))
+schema.dump(run_dir / "schema" / "input_schema.json")
+```
+
+---
+
+## Task 6 — Update `reports/eval_summary.md` (15 minutes)
+
+Fill in:
+
+1. Dataset + target + unit of analysis (1–2 lines)
+2. Baseline metrics (from `baseline_holdout.json`)
+3. Model metrics (from `holdout_metrics.json`)
+4. 2–3 caveats / likely failure modes
+
+**Checkpoint:** your eval summary compares baseline vs model using the same primary metric.
+
+---
+
+## Solution — a simple eval summary structure
+
+- **Run ID:** `<run_id>`
+- **Primary metric:** `<precision / recall / MAE>`
+- **Baseline:** `<value>`
+- **Model:** `<value>`
+- **Interpretation:** “Model beats baseline by ___ (absolute)”
+- **Caveats:** leakage risk, class imbalance, small data, etc.
+
+::: callout-tip
+Keep it honest. A baseline that is “not great” is still valuable if it’s reproducible and explainable.
+:::
+
+---
+
+## Git checkpoint (2 minutes)
+
+- `git status`
+- commit with message: `"w3d3: save holdout metrics + artifacts"`
+- push to GitHub
+
+**Checkpoint:** your repo shows the new commit online.
+
+---
+
+## Debug playbook (when you get stuck)
+
+1. Re-run the exact command and read the **first error line**
+2. Confirm your paths:
+   - `data/processed/features.<csv|parquet>`
+   - `models/registry/latest.txt`
+3. Print shapes:
+   - `X_train.shape`, `X_test.shape`
+4. Inspect columns:
+   - `X_train.columns.tolist()[:10]`
+5. Ask for clarification on the error (not code)
+
+::: callout-warning
+Do not “fix” by deleting random files. Fix by understanding the contract.
+:::
+
+---
+
+## Stretch goals (optional ⭐)
+
+- Classification: implement threshold selection (`max_f1`) and record chosen threshold
+- Add a small “error slice” table in `eval_summary.md`
+- Add a bootstrap CI for one metric (advanced)
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences each:
+
+1. Why do we save `holdout_predictions` instead of only saving metrics?
+2. What is the purpose of `input_schema.json`?
+3. What comparison makes a model improvement claim meaningful?
+
+---
+
+## What to do after class (Day 3 assignment)
+
+**Due:** before Day 4 (Dec 31, 2025)
+
+1. Ensure `train` creates today’s artifacts on your dataset:
+   - `holdout_metrics.json`
+   - `holdout_predictions.*`
+   - `holdout_input.*`
+   - `schema/input_schema.json`
+2. In `holdout_predictions`, identify:
+   - 2 false positives and 2 false negatives (or 4 large errors for regression)
+3. Add one paragraph to `reports/eval_summary.md`:
+   - “Most common failure pattern I observed was: ___”
+4. Commit + push
+
+**Deliverable:** GitHub repo link + latest `run_id`.
+
+::: callout-tip
+Tomorrow you will run `predict` on `holdout_input`. If `holdout_input` or schema is wrong, Day 4 will hurt.
+:::
+
+# Thank You! {.splash}
+
+<div style="width: 300px">{{< brand logo full >}}</div>

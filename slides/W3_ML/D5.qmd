@@ -1,0 +1,664 @@
+---
+pagetitle: "W3 D5"
+date: 2026-01-01
+---
+
+## GenAI policy reminder (submission day)
+
+You may use Generative AI **only** for clarifying questions.
+
+- ✅ Allowed: definitions, “what does this error mean?”, reading docs, concept explanations
+- ❌ Not allowed: generating your solution code, debugging by copy‑paste, writing full functions
+
+::: callout-warning
+Today is a submission day. Your repo must reflect **your** skill.
+:::
+
+---
+
+## Announcements / admin
+
+**What you submit today (minimum ✅)**
+- updated `reports/model_card.md`
+- updated `reports/eval_summary.md`
+- `uv run pytest` passes
+- `uv run ruff check .` passes *(install dev extra if needed)*
+- pushed to GitHub (public)
+
+::: callout-note
+Capstone teams + project ideas are finalized by end of **Week 5 (Jan 15, 2026)**.
+:::
+
+# Day 5: Write-up + submit
+
+**Goal:** turn your working ML system into a **reviewable, shippable repo**.
+
+::: {.muted}
+Bootcamp • SDAIA Academy
+:::
+
+::: {.notes}
+**Say:** “Today is not new ML. Today is credibility + shipping.”
+**Do:** show the submission checklist and where each item lives in the repo.
+:::
+
+---
+
+## Today’s Flow {.smaller}
+
+- **Session 1 (60m):** Model card = data contract + honest story
+- *Asr Prayer (20m)*
+- **Session 2 (60m):** Turn artifacts into a clear evaluation summary
+- *Maghrib Prayer (20m)*
+- **Session 3 (60m):** Final quality gate (tests, ruff, reproducibility)
+- *Isha Prayer (20m)*
+- **Hands-on (120m):** Fill reports, run checks, push to GitHub
+
+---
+
+## Learning Objectives
+
+By the end of today, you can:
+
+- Explain your baseline system to a teammate in **90 seconds**
+- Fill `model_card.md` with: problem, data contract, split, metrics, limitations
+- Fill `eval_summary.md` with: baseline vs model, key caveats, recommendation
+- Run the full quality gate: `ruff` + `pytest` + end-to-end CLI demo
+- Submit a repo that someone else can run from the README
+
+---
+
+## Warm-up (5 minutes)
+
+Confirm end-to-end still works on your latest run.
+
+**macOS/Linux**
+```bash
+uv run ml-baseline make-sample-data
+uv run ml-baseline train --target is_high_value
+run_id=$(cat models/registry/latest.txt)
+holdout=$(ls models/runs/$run_id/tables/holdout_input.* | head -n 1)
+uv run ml-baseline predict --run latest --input "$holdout" --output outputs/preds.csv
+```
+
+**Windows PowerShell**
+```powershell
+uv run ml-baseline make-sample-data
+uv run ml-baseline train --target is_high_value
+$run_id = Get-Content models/registry/latest.txt
+$holdout = (Get-ChildItem "models/runs/$run_id/tables" -Filter "holdout_input.*" | Select-Object -First 1).FullName
+uv run ml-baseline predict --run latest --input $holdout --output outputs/preds.csv
+```
+
+**Checkpoint:** `outputs/preds.csv` exists.
+
+---
+
+## The Week 3 finish line (minimum ✅)
+
+Your system is “done” when:
+
+- `ml-baseline train` saves a run folder with model + schema + metrics
+- `ml-baseline predict` produces a predictions file on new input
+- reports answer: **what**, **how well**, **what can go wrong**, **how to run**
+
+::: callout-tip
+A working model with no documentation is hard to trust.
+:::
+
+# Session 1
+
+::: {.muted}
+Model card = data contract + honest story
+:::
+
+---
+
+## Session 1 objectives
+
+- Understand what a model card is (and why teams use it)
+- Update your `model_card.md` to match your **actual** run artifacts
+- Write limitations in a way that protects you (and your future users)
+
+---
+
+## What is a model card?
+
+A model card is a short document that answers:
+
+- **What is this model for?**
+- **What data does it expect?** (contract)
+- **How was it evaluated?**
+- **What are the limitations?**
+- **How do I run it?**
+
+::: callout-note
+Think: “If I leave the company, can a teammate understand and rerun this?”
+:::
+
+---
+
+## Model card structure (minimum ✅)
+
+Keep it simple and scannable:
+
+1. **Prediction task** (target + unit of analysis)
+2. **Data contract** (required features, optional IDs, forbidden columns)
+3. **Training recipe** (split, baseline, model family)
+4. **Results** (baseline vs model on holdout)
+5. **Limitations + failure modes**
+6. **How to run** (train + predict commands)
+
+---
+
+## Where the truth lives (don’t guess)
+
+Use your artifacts to fill the model card:
+
+- data contract: `schema/input_schema.json`
+- run identity: `run_meta.json` + `models/registry/latest.txt`
+- metrics: `metrics/baseline_holdout.json` + `metrics/holdout_metrics.json`
+- examples: `tables/holdout_predictions.*`
+
+::: callout-tip
+Copy numbers from artifacts. Do not “estimate” your metrics.
+:::
+
+---
+
+## Micro-exercise: find 3 facts (6 minutes)
+
+From your **latest run folder**, find:
+
+1. your `run_id`
+2. one baseline metric value
+3. one model holdout metric value
+
+**Checkpoint:** you can point to the exact file for each fact.
+
+---
+
+## Solution (where to look)
+
+1. `models/registry/latest.txt` *(or `run_meta.json`)*
+2. `models/runs/<run_id>/metrics/baseline_holdout.json`
+3. `models/runs/<run_id>/metrics/holdout_metrics.json`
+
+---
+
+## Limitations (minimum ✅)
+
+Write 3–5 bullets that are true **now**:
+
+- data coverage limits (missing segments, small dataset)
+- label quality assumptions (how was y created?)
+- leakage risks you checked (and what you might have missed)
+- what “good performance” does **not** guarantee (business caveats)
+
+::: callout-warning
+Avoid vague limits like “model may be biased.” Be specific: “performance may drop for ___ because ___.”
+:::
+
+---
+
+## Session 1 recap
+
+- The model card is your **trust document**
+- Use artifacts as the source of truth
+- Clear limitations are a professional strength
+
+# Asr break {.splash}
+
+## 20 minutes
+
+**When you return:** open `reports/model_card.md` and your latest run folder side-by-side.
+
+# Session 2
+
+::: {.muted}
+Turn artifacts into a clear evaluation summary
+:::
+
+---
+
+## Session 2 objectives
+
+- Write an evaluation summary that compares **baseline vs model** fairly
+- Translate metrics into “what it means” (1–2 sentences)
+- Do light error analysis using `holdout_predictions.*`
+
+---
+
+## What is `eval_summary.md`?
+
+It is a **short decision memo**:
+
+- What you trained (so we know what we’re judging)
+- Results (baseline vs model)
+- What went wrong / where it fails
+- Whether you’d ship it as a baseline
+
+::: {.muted}
+Keep it short. The goal is clarity, not word count.
+:::
+
+---
+
+## Metrics: what to report (minimum ✅)
+
+Choose 1–2 “primary” metrics.
+
+**Classification (common)**
+- F1 or recall/precision (pick based on the decision)
+- ROC-AUC is OK as a secondary metric
+
+**Regression (common)**
+- MAE as primary
+
+::: callout-tip
+Report the baseline metric next to the model metric.
+:::
+
+---
+
+## Micro-exercise: interpret one metric (6 minutes)
+
+Open your `holdout_metrics.json` and answer:
+
+1. What is your **primary metric**?
+2. Is “higher is better” or “lower is better”?
+3. Write one sentence: “This means ___.”
+
+**Checkpoint:** your sentence is understandable by a non-ML teammate.
+
+---
+
+## Solution (example sentences)
+
+- **F1:** “On unseen holdout rows, the model balances precision and recall with F1 = ___.”
+- **Recall:** “The model catches ___% of positives on holdout, which matters because missing positives is costly.”
+- **MAE:** “On holdout, predictions are off by about ___ units on average.”
+
+---
+
+## Error analysis (minimum ✅)
+
+Use `holdout_predictions.*` to find:
+
+- 3–5 worst mistakes (false positives / false negatives)
+- a pattern (segment, feature range, missing values)
+
+::: callout-note
+You don’t need perfect analysis. You need *evidence* you looked.
+:::
+
+---
+
+## Optional ⭐: confidence intervals
+
+If your `holdout_metrics.json` includes a CI field (example: `roc_auc_ci` or `mae_ci`):
+
+- report it as a range
+- explain uncertainty in one sentence
+
+::: {.muted}
+Optional does **not** block submission.
+:::
+
+---
+
+## Session 2 recap
+
+- `eval_summary.md` is a decision memo
+- Always compare baseline vs model on the **same holdout**
+- A little error analysis beats none
+
+# Maghrib break {.splash}
+
+## 20 minutes
+
+**When you return:** run `python -m json.tool` on your metrics files and copy numbers into your report.
+
+# Session 3
+
+::: {.muted}
+Final quality gate (tests, ruff, reproducibility)
+:::
+
+---
+
+## Session 3 objectives
+
+- Run the “quality gate” commands and understand failures
+- Avoid the most common submission mistakes
+- Make your repo easy to grade (and easy to demo)
+
+---
+
+## The quality gate (minimum ✅)
+
+From repo root:
+
+1. `uv run pytest`
+2. `uv run ruff check .`
+3. *(optional)* `uv run ruff format .`
+
+::: callout-note
+If `ruff` is missing: `uv sync --extra dev`.
+:::
+
+---
+
+## Common failure modes (and fixes)
+
+- **Import errors:** you edited paths/imports → check `src/` package structure
+- **Non-determinism:** missing seed usage → set seeds in splits/training
+- **Schema errors:** predict fails on missing/extra columns → validate against `input_schema.json`
+
+::: callout-tip
+When tests fail, read the assertion message first. It usually tells you what artifact is missing.
+:::
+
+---
+
+## Micro-exercise: “make it gradeable” (5 minutes)
+
+Answer in one sentence each:
+
+1. What command trains your model?
+2. What command runs prediction?
+3. Where do graders find your written work?
+
+**Checkpoint:** you can point to the exact file paths.
+
+---
+
+## Solution
+
+1. `uv run ml-baseline train --target <your_target>`
+2. `uv run ml-baseline predict --run latest --input <file> --output outputs/preds.csv`
+3. `reports/model_card.md` and `reports/eval_summary.md`
+
+---
+
+## Session 3 recap
+
+- Passing tests + clean linting is part of “shipping”
+- Make your repo easy to run from the README
+- Don’t commit generated artifacts
+
+# Isha break {.splash}
+
+## 20 minutes
+
+**When you return:** start Hands-on Task 1 and don’t stop until the checklist is green.
+
+# Hands-on
+
+::: {.muted}
+Fill reports + run checks + submit
+:::
+
+---
+
+## Hands-on success criteria (today)
+
+**Minimum ✅**
+- `reports/model_card.md` complete (no blanks)
+- `reports/eval_summary.md` complete (baseline vs model)
+- `uv run pytest` passes
+- `uv run ruff check .` passes
+- pushed to GitHub (public)
+
+**Optional ⭐**
+- add confidence intervals to the write-up (if available)
+- add 1 small error slice (metrics by a segment column)
+
+---
+
+## Project layout (what you touch today)
+
+```text
+week3-ml-baseline-system/
+  reports/                 # you edit these
+  src/                     # you edit only if tests fail
+  tests/                   # run to verify
+  models/runs/             # generated (don’t commit)
+  outputs/                 # generated (don’t commit)
+```
+
+---
+
+## Task 1 — Locate your latest run (10 minutes)
+
+- Read `models/registry/latest.txt`
+- Open the run folder under `models/runs/<run_id>/`
+- Identify:
+  - `baseline_holdout.json`
+  - `holdout_metrics.json`
+
+**Checkpoint:** you can open both JSON files.
+
+---
+
+## Solution (Task 1)
+
+**macOS/Linux**
+```bash
+run_id=$(cat models/registry/latest.txt)
+ls models/runs/$run_id/metrics
+python -m json.tool models/runs/$run_id/metrics/baseline_holdout.json
+python -m json.tool models/runs/$run_id/metrics/holdout_metrics.json
+```
+
+**Windows PowerShell**
+```powershell
+$run_id = Get-Content models/registry/latest.txt
+ls "models/runs/$run_id/metrics"
+python -m json.tool "models/runs/$run_id/metrics/baseline_holdout.json"
+python -m json.tool "models/runs/$run_id/metrics/holdout_metrics.json"
+```
+
+---
+
+## Task 2 — Fill `reports/eval_summary.md` (25 minutes)
+
+- Describe what you trained (model family + preprocessing)
+- Paste baseline vs model metrics (holdout)
+- Do light error analysis:
+  - open `tables/holdout_predictions.*`
+  - identify 2–3 mistakes and a pattern
+- Finish with a recommendation: ship or not?
+
+**Checkpoint:** your summary includes **numbers** and **a recommendation**.
+
+---
+
+## Hint: quick error analysis without fancy tools
+
+- Classification:
+  - sort by `score` and look at wrong predictions
+  - find false positives (pred=1, y=0) and false negatives (pred=0, y=1)
+- Regression:
+  - compute absolute error: `abs(pred - y)` and sort
+
+::: {.muted}
+You can do this in a quick notebook, or export a small CSV sample and inspect it.
+:::
+
+---
+
+## Solution (Task 2: what “complete” looks like)
+
+In `reports/eval_summary.md` you have:
+
+- **Baseline metrics:** e.g., F1 = ___
+- **Holdout metrics:** e.g., F1 = ___, ROC-AUC = ___
+- **Worst cases:** 3 bullets
+- **Next fixes:** 2 bullets
+- **Recommendation:** 1–2 sentences
+
+---
+
+## Task 3 — Fill `reports/model_card.md` (30 minutes)
+
+- Ensure the data contract is explicit:
+  - target, unit of analysis
+  - required features + optional IDs
+  - forbidden columns (target + leakage)
+- Add the run_id you’re reporting
+- Add “how to run” commands (train + predict)
+
+**Checkpoint:** a teammate can run your commands without asking you questions.
+
+---
+
+## Model card template (final) {.smaller}
+
+````markdown
+# Model Card — Week 3 Baseline
+
+## 1) What is the prediction?
+- **Target (y):** `__________`
+- **Unit of analysis:** one row = __________
+- **Decision supported:** __________
+
+## 2) Data contract (inference)
+- **ID passthrough columns:** __________
+- **Required feature columns (X):** __________
+- **Forbidden columns:** `__________` (target + leakage)
+
+## 3) Training recipe
+- **Split strategy:** random holdout (test_size=___, seed=___)
+- **Baseline:** Dummy (most_frequent / mean)
+- **Model family:** __________ (pipeline: preprocessing + estimator)
+
+## 4) Results (holdout)
+- **Baseline:** __________
+- **Model:** __________
+
+## 5) Limitations + failure modes
+- …
+- …
+- …
+
+## 6) How to run
+```bash
+uv run ml-baseline train --target __________
+uv run ml-baseline predict --run latest --input <file> --output outputs/preds.csv
+```
+
+````
+
+---
+
+## Task 4 — Run the quality gate (15 minutes)
+
+- Install dev tools if needed: `uv sync --extra dev`
+- Run:
+  - `uv run ruff check .`
+  - `uv run pytest`
+
+**Checkpoint:** both commands exit with code 0.
+
+---
+
+## Solution (Task 4)
+
+**macOS/Linux**
+```bash
+uv sync --extra dev
+uv run ruff check .
+uv run pytest
+```
+
+**Windows PowerShell**
+```powershell
+uv sync --extra dev
+uv run ruff check .
+uv run pytest
+```
+
+::: callout-tip
+If you used `ruff format .`, re-run tests after formatting.
+:::
+
+---
+
+## Task 5 — Git checkpoint + submit (10 minutes)
+
+- `git status`
+- Commit your report updates
+- Push to GitHub
+
+**Checkpoint:** your latest commit is visible online.
+
+---
+
+## Solution (Task 5)
+
+```bash
+git status
+git add reports/model_card.md reports/eval_summary.md
+git commit -m "w3d5: finalize reports + submission"
+git push
+```
+
+::: callout-warning
+Do not commit `models/runs/` or `outputs/`.
+:::
+
+---
+
+## Debug playbook (submission blockers)
+
+If something fails:
+
+- `ruff` not found → `uv sync --extra dev`
+- tests fail → read assertion; it usually names the missing file
+- predict errors → compare input columns to `schema/input_schema.json`
+- path issues → confirm you run from repo root (where `pyproject.toml` is)
+
+---
+
+## Stretch goals (optional)
+
+⭐ If your minimum is done:
+
+- add 1 “slice” metric (e.g., performance by `country`)
+- try `--threshold-strategy max_f1` (classification) and report the chosen threshold
+- add a small Plotly confusion matrix or error histogram (optional extra)
+
+---
+
+## Exit Ticket
+
+In 1–2 sentences:
+
+1. What is the single most important limitation of your model?
+2. If a teammate runs `predict` with a missing column, what should happen?
+3. Would you ship this baseline today? Why/why not?
+
+---
+
+## What to do after class (Day 5 submission)
+
+**Due:** today (Jan 1, 2026)
+
+1. Push your final repo to GitHub (public)
+2. Verify these files are present and updated:
+   - `reports/model_card.md`
+   - `reports/eval_summary.md`
+3. Verify:
+   - `uv run pytest`
+   - `uv run ruff check .`
+
+**Deliverable:** GitHub repo link.
+
+::: callout-tip
+Before you submit, clone your repo into a new folder and run the quickstart commands. If it works there, it will grade well.
+:::
+
+# Thank You! {.splash}
+
+<div style="width: 300px">{{< brand logo full >}}</div>
